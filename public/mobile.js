@@ -9,7 +9,7 @@
   let draft = null;      // walk-around check in progress
   let jobDraft = null;   // new job card (Details tab before it is saved)
   let defDraft = null;   // ad-hoc defect report
-  const ui = { q: "", jobsTab: "active", jq: "", hTab: "all", sheet: null };
+  const ui = { q: "", jobsTab: "all", jobsWho: "all", jq: "", hTab: "all", hq: "", sheet: null };
   const sigs = {};
   const LS = { me: "martleys-m-me", draft: "martleys-m-draft" };
 
@@ -42,20 +42,22 @@
     document.querySelectorAll("canvas[data-sig]").forEach(cv => {
       const k = cv.dataset.sig;
       M.sigPad(cv, k === "draft" ? draft && draft.sig : sigs[k], url => {
-        if (k === "draft") { draft.sig = url; lsSet(LS.draft, draft); const b = $("#submitbtn"); if (b) b.disabled = !b.dataset.ready; }
+        if (k === "draft") { if (draft) { draft.sig = url; lsSet(LS.draft, draft); } }
         else { sigs[k] = url; const b = $("#closebtn"); if (b) b.disabled = false; }
       });
     });
     tick();
   }
   // White status-bar text while a dark header (home hero, login) sits under it; dark otherwise.
-  function sbTone() {
-    const h = document.querySelector("#app .hero"), scr = $("#app > .scr");
-    const dark = !!(ui.sheet ? 0 : h && h.offsetHeight - (scr ? scr.scrollTop : 0) > 50);
-    document.body.dataset.sb = dark ? "light" : "dark";
-  }
+  function sbTone() { document.body.dataset.sb = ui.sheet ? "dark" : "light"; }
   setInterval(tick, 1000);
-  function tick() { document.querySelectorAll("[data-since]").forEach(el => { el.textContent = clockText((Date.now() - Number(el.dataset.since)) / 1000 + Number(el.dataset.base || 0) * 60); }); }
+  function tick() {
+    document.querySelectorAll("[data-since]").forEach(el => { el.textContent = clockText((Date.now() - Number(el.dataset.since)) / 1000 + Number(el.dataset.base || 0) * 60); });
+    document.querySelectorAll("[data-clock]").forEach(el => { const d = new Date(); el.textContent = M.pad(d.getHours()) + ":" + M.pad(d.getMinutes()) + (el.dataset.clock === "s" ? ":" + M.pad(d.getSeconds()) : ""); });
+  }
+  // "Wed, 4 Nov 2026 at 10:09"
+  const fmtLong = ts => { const d = new Date(ts); return M.DOW[d.getDay()] + ", " + d.getDate() + " " + M.MON[d.getMonth()] + " " + d.getFullYear() + " at " + fmtT(ts); };
+  const fmtSlash = ts => { const d = new Date(ts); return M.pad(d.getDate()) + "/" + M.pad(d.getMonth() + 1) + "/" + d.getFullYear(); };
   const clockText = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 3600) + ":" + M.pad(Math.floor(s / 60) % 60) + ":" + M.pad(s % 60); };
 
   function view(r) {
@@ -64,6 +66,7 @@
       case "fleet": return fleet();
       case "check": return r.parts[1] === "new" ? checkFlow(r.q) : checkView(r.parts[1], r.q);
       case "history": return history();
+      case "profile": return profile();
       case "defect": return reportDefect(r.q);
       case "jobs": if (r.q.tab) { ui.jobsTab = r.q.tab; window.history.replaceState(null, "", "#/jobs"); } return jobsList();
       case "job": return r.parts[1] === "new" ? jobNew(r.q) : jobSheet(r.parts[1], r.q.tab || "details");
@@ -73,95 +76,62 @@
 
   // Standard screen: sticky top bar, body, optional dock or bottom tabs.
   function screen(title, body, opt = {}) {
-    const back = opt.back === false ? `<span class="side"></span>` : `<a class="round" href="${opt.back || "#/"}" aria-label="Back">${I("left", 20, 2.4)}</a>`;
+    const back = opt.back === false ? `<span class="side"></span>` : `<a class="round" href="${opt.back || "#/"}" aria-label="Back">${I("left", 20, 2.6)}</a>`;
     return `<div class="bar"><span style="width:42px">${back}</span><div class="ttl">${esc(title)}</div><span class="side">${opt.right || ""}</span></div>
-      <div class="body">${body}</div>${opt.dock ? `<div class="dock">${opt.dock}</div>` : tabs()}`;
+      <div class="body">${body}</div>${opt.dock ? `<div class="dock">${opt.dock}</div>` : ""}${opt.noTabs ? "" : tabs()}`;
   }
   function tabs() {
     const r = route();
-    const openN = S.jobs.filter(j => j.status !== "Complete").length;
-    const items = [["", "home", "Home"], ["check/new", "clip", "Walk-around"], ["jobs", "wrench", "Job sheets", openN], ["history", "list", "Checks"]];
-    const cur = r.name === "check" && r.parts[1] === "new" ? "check/new" : r.name === "check" ? "history" : r.name === "job" ? "jobs" : r.name;
-    return `<nav class="tabs">${items.map(([h, ic, l, n]) => `<a href="#/${h}" class="${cur === h ? "on" : ""}"><span class="ti">${I(ic, 21)}</span>${l}${n ? `<span class="badge">${n}</span>` : ""}</a>`).join("")}</nav>`;
+    const items = [["check/new", "bus", "Checklist"], ["", "dash", "Home"], ["profile", "users", "Profile"]];
+    const cur = r.name === "check" || r.name === "history" ? "check/new" : r.name === "profile" ? "profile" : "";
+    return `<nav class="tabs">${items.map(([h, ic, l]) => `<a href="#/${h}" class="${cur === h ? "on" : ""}"><span class="ti">${I(ic, 22)}</span>${l}</a>`).join("")}</nav>`;
   }
-  const meBtn = (dark) => `<button class="${avClass(me)}" style="${dark ? "" : "width:40px;height:40px"}" onclick="A.sheet('me')" aria-label="Profile">${initials(me.name)}</button>`;
+  const meBtn = () => `<a class="${avClass(me)}" style="width:38px;height:38px" href="#/profile" aria-label="Profile">${initials(me.name)}</a>`;
   const vTag = (v, lg) => `<span class="fleetno ${lg ? "lg" : ""}">${esc(v.fleet)}</span>`;
 
   /* ---------- login ---------- */
-  let pinFor = null, pin = "";
   function login() {
-    const p = pinFor && X.person(pinFor);
     const ppl = S.staff.filter(s => s.role !== "admin").sort((a, b) => a.name.localeCompare(b.name));
-    const people = `<h3 style="margin:20px 2px 10px">Who's signing in?</h3><div class="people">${ppl.map(s => `<button class="person" onclick="A.pick('${s.id}')"><span class="${avClass(s)}">${initials(s.name)}</span><span class="ellipsis">${esc(s.name)}</span></button>`).join("")}</div>`;
-    return `<div class="login"><div class="hero"><div class="top"><img src="logo.png" alt="Martley's"></div><h1>Vehicle checks<br>&amp; job sheets</h1><p>Sign in to start your walk-around check.</p></div>
-      <div class="sheet">${p ? `
-        <button class="round" onclick="A.pick(null)" aria-label="Back">${I("left", 20, 2.4)}</button>
-        <div style="text-align:center;margin-top:-6px"><div class="${avClass(p)} lg" style="margin:0 auto">${initials(p.name)}</div><h2 style="margin-top:12px;font-size:20px">${esc(p.name)}</h2><div class="muted small">Enter your PIN</div>
-          <div class="pindots" id="pindots">${[0, 1, 2, 3].map(i => `<i class="${i < pin.length ? "f" : ""}"></i>`).join("")}</div></div>
-        <div class="pinpad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button onclick="A.key('${n}')">${n}</button>`).join("")}<span></span><button onclick="A.key('0')">0</button><button class="del" onclick="A.key('del')" aria-label="Delete">⌫</button></div>
-        <p class="muted xs" style="text-align:center;margin-top:16px">Demo PIN ${p.pin}</p>`
-      : people + `<p class="muted xs" style="margin-top:20px">Demo PIN 1111 for everyone. The office uses the <a href="/admin/" style="text-decoration:underline">desktop admin</a>.</p>`}</div></div>`;
+    return `<div class="login2"><div class="logoc"><img src="logo.png" alt="Martley's"></div>
+      <div class="lpanel"><select class="lin" id="luser" onchange="document.getElementById('lerr').textContent=''"><option value="">SELECT USER</option>${ppl.map(p => `<option value="${p.id}">${esc(p.name)} · ${esc(M.ROLE[p.role])}</option>`).join("")}</select>
+        <input class="lin" id="lpin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="PIN" onkeydown="if(event.key==='Enter')A.login()"></div>
+      <button class="lbtn" onclick="A.login()">Login</button><div class="lerr" id="lerr"></div>
+      <p class="lhint">Demo PIN 1111 for everyone. The office and workshop manager use the <a href="/admin/">desktop admin</a>.</p></div>`;
   }
 
-  /* ---------- home dashboard (drivers and mechanics) ---------- */
-  // Like the Dashboard tab in Martley's current app: a greeting, the one thing to do now,
-  // big tiles for every feature, then what needs attention.
-  function tile(href, ic, color, title, sub, badge) {
-    return `<a class="qa ${color}" href="${href}">${badge ? `<span class="qb">${badge}</span>` : ""}<span class="qi">${I(ic, 22, 2.2)}</span><b>${title}</b><span>${sub}</span></a>`;
+  /* ---------- home ---------- */
+  function qa(href, ic, title, sub, opt = {}) {
+    if (opt.locked) return `<div class="qa2 locked"><span class="qi">${I(ic, 22, 2.2)}</span><div class="grow"><b>${title}</b><span>${sub}</span></div><span class="lockpill">${I("lock", 13, 2.4)} Checklist first</span></div>`;
+    return `<a class="qa2" href="${href}"><span class="qi">${I(ic, 22, 2.2)}</span><div class="grow"><b>${title}</b><span>${sub}</span></div>${opt.badge ? `<span class="badge">${opt.badge}</span>` : ""}<span class="qc">${I("chev", 18, 2.4)}</span></a>`;
+  }
+  function attention() {
+    return S.jobs.filter(j => j.status !== "Complete" && (j.priority === "VOR" || !j.mechId)).sort((a, b) => (a.priority === "VOR" ? 0 : 1) - (b.priority === "VOR" ? 0 : 1) || b.created - a.created);
   }
   function home() {
-    const hr = new Date().getHours();
-    const vor = S.vehicles.filter(X.vorJob);
-    const checkedN = S.vehicles.filter(v => X.checkedToday(v)).length;
-    const head = `<div class="hero"><div class="top"><img src="logo.png" alt="Martley's">${meBtn(true)}</div>
-        <h1>Good ${hr < 12 ? "morning" : hr < 18 ? "afternoon" : "evening"},<br>${esc(me.name.split(" ")[0])}</h1><p>${M.DOW[new Date().getDay()]} ${fmtD(today())} · Kilminchy depot</p>
-        <div class="hchips"><a href="#/fleet"><i class="dot ${vor.length ? "red" : "green"}"></i>${vor.length ? vor.length + " off road" : "Full fleet available"}</a><a href="#/fleet"><i class="dot blue"></i>${checkedN}/${S.vehicles.length} checked today</a></div></div>`;
-    return head + `<div class="body lift">${allHome(vor)}</div>${tabs()}`;
-  }
-
-  function allHome(vor) {
-    const open = S.jobs.filter(j => j.status !== "Complete");
-    const myJobs = open.filter(j => j.mechId === me.id);
-    const myDefs = open.filter(j => j.reportedBy === me.id && j.item);
-    const mine = S.checks.filter(c => c.driverId === me.id).sort((a, b) => b.at - a.at);
-    const todays = mine.filter(c => isoOf(c.at) === today());
-    const recent = S.checks.slice().sort((a, b) => b.at - a.at);
-    const todayDefs = X.checksOn(today()).reduce((a, c) => a + M.defectsOf(c).length, 0);
-    const attention = open.filter(j => j.priority === "VOR" || !j.mechId).sort((a, b) => (a.priority === "VOR" ? 0 : 1) - (b.priority === "VOR" ? 0 : 1) || b.created - a.created);
-    const run = S.jobs.find(j => (j.labour || []).some(l => !l.end && l.mechId === me.id));
+    const hr = new Date().getHours(), c = me.clock;
+    const open = S.jobs.filter(j => j.status !== "Complete"), mineOpen = open.filter(j => j.mechId === me.id);
+    const todays = S.checks.filter(x => x.driverId === me.id && isoOf(x.at) === today()).sort((a, b) => b.at - a.at);
+    const vor = S.vehicles.filter(X.vorJob), att = attention();
     const dv = draft && X.veh(draft.vehicleId);
-    let now;
+    const run = S.jobs.find(j => (j.labour || []).some(l => !l.end && l.mechId === me.id));
+    const driver = me.role === "driver", checked = todays.length > 0;
+    const head = `<div class="hhead"><div class="row" style="gap:12px"><span class="hav">${initials(me.name)}</span><div class="grow"><h1>Good ${hr < 12 ? "Morning" : hr < 18 ? "Afternoon" : "Evening"}, ${esc(me.name.split(" ")[0])}</h1><div class="htime"><i class="dot green"></i><span data-clock="m">${fmtT(Date.now())}</span>${c ? ` · on ${esc(c.type)} since ${fmtT(c.at)}` : ""}</div></div>
+          <a class="hic" href="#/fleet" aria-label="Fleet status">${I("bus", 19)}</a><button class="hic" onclick="A.sheet('alerts')" aria-label="Needs attention">${I("alert", 19)}${att.length ? `<span class="hdot">${att.length}</span>` : ""}</button></div>
+        <div class="hbtns">${c ? `<button class="hout" onclick="A.sheet('clockout')">${I("clock", 18)} Clock Out</button>` : `<button class="hin" onclick="A.clockIn()">${I("check", 18, 2.6)} Clock In</button>`}<button class="hsw" onclick="A.sheet('switch')">${I("refresh", 18)} Switch</button></div></div>`;
+    let now = "";
     if (run) {
-      // a job on the clock is the most important thing on screen
       const v = X.veh(run.vehicleId), l = run.labour.find(x => !x.end && x.mechId === me.id);
-      now = `<div class="start oncl"><div class="row"><div class="ic">${I("clock", 26)}</div><div class="grow"></div>${pill("green", "On the clock")}</div>
-        <h2>#${esc(run.id)} · ${esc(v.fleet)}</h2><p class="ellipsis">${esc(run.title)}</p>
-        <div class="bigtime"><span data-since="${l.start}">${clockText((Date.now() - l.start) / 1000)}</span></div>
-        <div class="row"><a class="btn pri grow" href="#/job/${run.id}?tab=work">Open job sheet</a><button class="btn danger" onclick="A.clock('${run.id}')">${I("stop", 16)} Stop</button></div></div>`;
-    } else {
-      now = `<a class="start" href="#/check/new"><div class="row"><div class="ic">${I("clip", 26)}</div><div class="grow"></div>${dv ? pill("amber", "In progress") : todays.length ? pill("green", I("check", 12, 3) + " Done today") : pill("amber", "Due before first trip")}</div>
-        <h2>${dv ? "Continue check on " + esc(dv.fleet) : todays.length ? "Checking another vehicle?" : "Start your walk-around check"}</h2>
-        <p>${dv ? esc(dv.reg) + " · " + Object.keys(draft.results).length + " items done so far" : todays.length ? "You checked " + todays.map(c => esc(X.veh(c.vehicleId).fleet)).join(", ") + " today at " + fmtT(todays[0].at) + "." : "Check your vehicle before its first use today. About 8 minutes."}</p>
-        <span class="btn go block lg">${dv ? "Continue check" : "Start check"} ${I("chev", 18, 2.5)}</span></a>`;
+      now = `<div class="oncl2"><div class="row"><span class="dot green"></span><b class="grow">On the clock · #${esc(run.id)} ${esc(v.external ? v.reg : v.fleet)}</b><span class="bigt" data-since="${l.start}">${clockText((Date.now() - l.start) / 1000)}</span></div><div class="small ellipsis" style="margin-top:4px">${esc(run.title)}</div>
+        <div class="row" style="margin-top:12px"><a class="btn pri grow" href="#/job/${run.id}?tab=work">Open job sheet</a><button class="btn danger" onclick="A.clock('${run.id}')">${I("stop", 16)} Stop</button></div></div>`;
     }
-    return `${now}
-      <div class="sec"><h3>Quick actions</h3></div>
-      <div class="qgrid">
-        ${tile("#/check/new", "clip", "green", "Walk-around", todays.length ? "Done today" : "Not done today")}
-        ${tile("#/defect", "alert", "red", "Report defect", "Tell the workshop")}
-        ${tile("#/jobs", "wrench", "amber", "Job sheets", open.length + " active", open.length || "")}
-        ${tile("#/job/new", "plus", "blue", "New job card", "Service, repair…")}
-        ${tile("#/history", "list", "teal", "Checks", todayDefs ? todayDefs + " defects today" : "No defects today")}
-        ${tile("#/fleet", "bus", "slate", "Fleet status", vor.length ? vor.length + " off road" : "All available", vor.length || "")}
-        ${tile("#/jobs?tab=mine", "users", "amber", "My jobs", myJobs.length ? myJobs.length + " assigned to you" : "None assigned", myJobs.length || "")}
-        ${tile("tel:0578620888", "phone", "teal", "Call depot", "057 862 0888")}
-      </div>
-      <div class="sec"><h3>Needs attention</h3>${attention.length ? `<a href="#/jobs">All jobs</a>` : ""}</div>
-      ${attention.length ? `<div class="card list">${attention.slice(0, 5).map(j => { const v = X.veh(j.vehicleId); return `<a class="li" href="#/job/${j.id}">${vTag(v)}<div class="grow"><div class="t ellipsis">${esc(j.title)}</div><div class="m">#${esc(j.id)} · ${fmtDT(j.created)}</div></div>${j.priority === "VOR" ? pill("red", "Off road") : pill("amber", "Unassigned")}<span class="chev">${I("chev", 16)}</span></a>`; }).join("")}</div>`
-        : `<div class="card pad row" style="gap:12px"><span style="color:var(--green-ink)">${I("check", 22, 2.6)}</span><div class="small">Nothing urgent — no vehicles off road and every job is assigned.</div></div>`}
-      ${myDefs.length ? `<div class="sec"><h3>Defects you reported</h3></div><div class="card list">${myDefs.map(j => { const v = X.veh(j.vehicleId); return `<a class="li" href="#/job/${j.id}">${vTag(v)}<div class="grow"><div class="t ellipsis">${esc(j.title)}</div><div class="m">${fmtDT(j.created)}</div></div>${statusPill(j.status)}</a>`; }).join("")}</div>` : ""}
-      <div class="sec"><h3>Latest checks</h3><a href="#/history">See all</a></div>
-      <div class="card list">${recent.length ? recent.slice(0, 4).map(checkRow).join("") : `<div class="empty">No checks yet.</div>`}</div>`;
+    return head + `<div class="body home2">${now}<h2 class="qah">Quick Access</h2>
+      ${qa("#/check/new", "clip", "Walk-around Checklist", dv ? "Continue check on " + esc(dv.fleet) + " · " + Object.keys(draft.results).length + " items done" : checked ? "Done today at " + fmtT(todays[0].at) + " · " + esc(X.veh(todays[0].vehicleId).fleet) : "Complete before shift")}
+      ${qa("#/defect", "alert", "Report a Defect", "Goes straight to the workshop")}
+      ${qa("#/jobs", "wrench", "Job Sheets", mineOpen.length ? mineOpen.length + " assigned to you · " + open.length + " open" : open.length + " open job cards", { badge: mineOpen.length || "", locked: driver && !checked })}
+      ${qa("#/history", "list", "Check History", "This week's submissions")}
+      ${qa("#/fleet", "bus", "Fleet Status", vor.length ? vor.length + " off road · " + S.vehicles.filter(v => X.checkedToday(v)).length + "/" + S.vehicles.length + " checked" : "Whole fleet available", { badge: vor.length || "" })}
+      ${qa("tel:0578620888", "phone", "Call the Depot", "057 862 0888")}
+      <div class="appver">App Version : 2.4.0</div></div>${tabs()}`;
   }
 
   /* ---------- fleet status ---------- */
@@ -188,69 +158,41 @@
   }
   const itemDone = r => r && (r.s !== "def" || (r.note && r.note.trim() && r.sev));
 
-  function pickVehicle() {
-    const q = ui.q.toLowerCase();
-    const list = S.vehicles.filter(v => !q || (v.fleet + " " + v.reg + " " + v.model + " " + v.type).toLowerCase().includes(q));
-    return screen("Select vehicle", `<div class="search">${I("search", 18)}<input id="vsearch" placeholder="Fleet no. or reg" value="${esc(ui.q)}" oninput="A.search(this.value)" autocomplete="off"></div>
-      <div class="card list" style="margin-top:12px">${list.map(v => {
-        const vor = X.vorJob(v), c = X.checkedToday(v);
-        return `<a class="li" href="#/check/new?v=${v.id}">${vTag(v)}<div class="grow"><div class="t">${esc(v.reg)}</div><div class="m ellipsis">${esc(v.model)} · ${esc(v.type)}</div></div>${vor ? pill("red", "Off road") : c ? pill("green", I("check", 12, 3) + " " + fmtT(c.at)) : ""}<span class="chev">${I("chev", 16)}</span></a>`;
-      }).join("") || `<div class="empty">No vehicles match.</div>`}</div>`);
-  }
-
   function checkFlow(q) {
     if (q.v && (!draft || draft.vehicleId !== q.v)) startDraft(q.v);
-    if (!draft) return pickVehicle();
-    const v = X.veh(draft.vehicleId), secs = M.sectionsFor(v);
-    const steps = ["Vehicle", ...secs.map(s => s.name), "Finish"];
-    const st = draft.step, total = secs.reduce((a, s) => a + s.items.length, 0);
+    const v = draft && X.veh(draft.vehicleId), secs = v ? M.sectionsFor(v) : [];
+    const total = secs.reduce((a, s) => a + s.items.length, 0);
     const done = secs.reduce((a, s) => a + s.items.filter(it => itemDone(draft.results[it.key])).length, 0);
-    const odoOk = draft.odo && Number(draft.odo) >= v.odo;
-    let body = "", next = "";
-    if (st === 0) {
-      const vor = X.vorJob(v), known = X.openJobs(v).filter(j => j !== vor);
-      body = `<div class="card pad"><div class="vcard">${vTag(v, 1)}<div class="grow"><div style="font-weight:800;font-size:18px">${esc(v.model)}</div><div class="muted small"><span class="reg">${esc(v.reg)}</span> · ${esc(v.type)} · ${v.seats} seats</div></div></div>
-          <div class="kv" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line2)"><div><span>Driver</span><b>${esc(me.name)}</b></div><div><span>Date · time</span><b>${fmtD(today())} · ${fmtT(draft.started)}</b></div></div></div>
-        ${vor ? `<div class="notice red" style="margin-top:12px">${I("alert")}<div><b>Off the road — do not drive.</b><br>${esc(vor.title)}. Speak to the transport office.</div></div>` : ""}
-        ${known.length ? `<div class="notice amber" style="margin-top:12px">${I("wrench")}<div><b>Already with the workshop</b> — no need to report again:<br>${known.map(j => "• " + esc(j.title)).join("<br>")}</div></div>` : ""}
-        <div class="card pad stack" style="margin-top:12px">
-          <div><label class="f" for="odo">Odometer reading *</label><input class="in" id="odo" inputmode="numeric" placeholder="e.g. ${(v.odo + 140).toLocaleString("en-IE")}" value="${draft.odo}" oninput="A.odo(this.value)"><div class="xs muted" style="margin-top:6px">Last recorded ${km(v.odo)}</div><div class="xs" id="odoerr" style="color:var(--red);margin-top:3px"></div></div>
-          <div><label class="f">General remarks</label><textarea class="in" placeholder="Anything worth noting (optional)" oninput="A.remarks(this.value)" style="min-height:70px">${esc(draft.remarks)}</textarea></div></div>`;
-      next = `<button class="btn lg pri grow" id="nextbtn" ${odoOk ? "" : "disabled"} onclick="A.step(1)">Start checklist ${I("chev", 18, 2.5)}</button>`;
-    } else if (st <= secs.length) {
-      const s = secs[st - 1], sd = s.items.every(it => itemDone(draft.results[it.key]));
-      body = `<div class="secthead"><div class="grow"><div class="n">SECTION ${st} OF ${secs.length}</div><h2 style="font-size:20px">${esc(s.name)}</h2></div><button class="allok" onclick="A.allOk(${st - 1})">${I("checks", 16, 2.4)} All OK</button></div>
-        <div class="card">${s.items.map(itemRow).join("")}</div>`;
-      next = `<button class="btn lg pri grow" id="nextbtn" ${sd ? "" : "disabled"} onclick="A.step(${st + 1})">${st === secs.length ? "Review & sign" : "Next: " + esc(steps[st + 1])} ${I("chev", 18, 2.5)}</button>`;
-    } else {
-      const defs = Object.entries(draft.results).filter(([, r]) => r.s === "def"), major = defs.some(([, r]) => r.sev === "major");
-      const ok = Object.values(draft.results).filter(r => r.s === "ok").length, na = Object.values(draft.results).filter(r => r.s === "na").length;
-      body = `${done < total ? `<div class="notice amber" style="margin-bottom:12px">${I("alert")}<div>${total - done} item${total - done > 1 ? "s" : ""} still to check.</div></div>` : ""}
-        ${defs.length ? `<div class="card"><div class="li" style="cursor:default"><h2 class="grow">${defs.length} defect${defs.length > 1 ? "s" : ""} found</h2>${pill(major ? "red" : "amber", major ? "Off road" : "Safe to drive")}</div>
-            <div class="list" style="border-top:1px solid var(--line2)">${defs.map(([k, r]) => `<div class="li" style="align-items:flex-start;cursor:default">${pill(r.sev === "major" ? "red" : "amber", r.sev === "major" ? "Major" : "Minor")}<div class="grow"><div class="t" style="font-size:14px">${esc(M.itemLabel(k))}</div><div class="m">${esc(r.note)}</div></div></div>`).join("")}</div></div>
-          <div class="notice ${major ? "red" : "blue"}" style="margin-top:12px">${I(major ? "alert" : "wrench")}<div>${major ? "<b>Do not drive this vehicle.</b> It will be taken off the road and the workshop alerted." : "A job card goes to the workshop for each defect."}</div></div>`
-        : `<div class="card pad row" style="gap:14px"><div style="width:48px;height:48px;border-radius:50%;background:var(--green-bg);color:var(--green-ink);display:grid;place-items:center;flex:none">${I("check", 26, 3)}</div><div><h2>Nil defects</h2><div class="muted small">${ok} OK${na ? " · " + na + " N/A" : ""} — vehicle fit to drive</div></div></div>`}
-        <div class="sec"><h3>Images (${draft.photos.length}/6)</h3></div>
-        <div class="card pad">${draft.photos.length ? `<div class="photos" style="margin:0 0 10px">${draft.photos.map((p, i) => `<div class="ph-i"><img src="/api/files/${p}" onclick="M.lightbox(this.src)" alt=""><button class="rm" onclick="A.rmPhoto(${i})">${I("x", 12, 3)}</button></div>`).join("")}</div>` : ""}
-          ${draft.photos.length < 6 ? `<div class="pickrow"><label class="pickbtn">${I("camera", 18)} Camera<input type="file" accept="image/*" capture="environment" onchange="A.chkPhoto(this)"></label><label class="pickbtn">${I("image", 18)} Library<input type="file" accept="image/*" onchange="A.chkPhoto(this)"></label></div>` : `<div class="muted small">Maximum of 6 images.</div>`}</div>
-        <div class="sec"><h3>Signature</h3></div>
-        <div class="card pad stack"><div class="small muted">I confirm I have carried out this walk-around check on <b style="color:var(--ink)">${esc(v.reg)}</b> and the results are accurate.</div>
-          <div class="sigwrap"><canvas data-sig="draft"></canvas><div class="ph">Sign with your finger</div><button class="btn sm soft clr" onclick="A.clearSig('draft')">Clear</button></div>
-          <div class="row xs muted">${I("pen", 14)} ${esc(me.name)} · ${fmtDT(Date.now())}</div></div>`;
-      next = `<button class="btn lg go grow" id="submitbtn" data-ready="${done === total ? 1 : ""}" ${done === total && draft.sig ? "" : "disabled"} onclick="A.submit()">${I("check", 20, 2.6)} Submit check</button>`;
-    }
-    const prog = `<div class="prog"><div class="track"><i style="width:${Math.round(done / total * 100)}%"></i></div><b>${done}/${total}</b></div>`;
-    return `<div class="bar"><button class="round" onclick="${st ? `A.step(${st - 1})` : "A.cancel()"}" aria-label="Back">${I(st ? "left" : "x", 20, 2.4)}</button><div class="ttl">${esc(v.fleet)} · ${esc(v.reg)}</div><span class="side"></span></div>
-      <div class="body" style="padding-bottom:20px">${prog}${body}</div><div class="dock">${next}</div>`;
+    const defs = draft ? Object.values(draft.results).filter(r => r.s === "def") : [];
+    const nil = v && done === total && !defs.length;
+    const vor = v && X.vorJob(v), known = v ? X.openJobs(v).filter(j => j !== vor) : [];
+    const body = `<div class="infobox"><div>Employee : <b>${esc(me.name)}</b></div><div>Date : <b>${fmtSlash(Date.now())}</b></div><div>Reg : <b>${v ? esc(v.reg) : "—"}</b></div><div>Time : <b data-clock="s">${fmtT(Date.now())}</b></div></div>
+      <label class="fl">Select Vehicle *</label>
+      <select class="in dk" onchange="A.pickVeh(this.value)"><option value="">Select Vehicle</option>${S.vehicles.map(x => `<option value="${x.id}" ${v && x.id === v.id ? "selected" : ""}>${esc(x.fleet)} · ${esc(x.reg)} · ${esc(x.model)}${X.vorJob(x) ? " (off road)" : X.checkedToday(x) ? " ✓" : ""}</option>`).join("")}</select>
+      ${vor ? `<div class="notice red" style="margin-top:12px">${I("alert")}<div><b>Off the road — do not drive.</b><br>${esc(vor.title)}. Speak to the transport office.</div></div>` : ""}
+      ${known.length ? `<div class="notice amber" style="margin-top:12px">${I("wrench")}<div><b>Already with the workshop</b> — no need to report again:<br>${known.map(j => "• " + esc(j.title)).join("<br>")}</div></div>` : ""}
+      ${v ? `<label class="fl">General Remarks</label><input class="in" placeholder="Enter general remarks…" value="${esc(draft.remarks)}" oninput="A.remarks(this.value)">
+      <label class="fl">Odometer Reading *</label><input class="in" id="odo" inputmode="numeric" placeholder="Enter odometer reading…" value="${draft.odo}" oninput="A.odo(this.value)"><div class="xs muted" style="margin-top:5px">Last recorded ${km(v.odo)}</div><div class="xs" id="odoerr" style="color:var(--red);margin-top:2px"></div>` : ""}
+      <div class="ctable"><div class="chd"><span>Item</span><span>Checked</span><span>Remark</span></div>
+        ${v ? secs.map(sec => `<div class="csec">${esc(sec.name)}</div>` + sec.items.map(itemRow).join("")).join("") : `<div class="cnone">Select a vehicle to load the checklist</div>`}</div>
+      ${v ? `<div class="cprog">${done} of ${total} checked${defs.length ? ` · <b style="color:var(--red)">${defs.length} defect${defs.length > 1 ? "s" : ""}</b>` : ""}</div>
+      <button class="nilrow" onclick="A.nil()"><span class="nbox ${nil ? "on" : ""}">${I(nil ? "check" : "x", 18, 3)}</span>NIL Defects</button>
+      <button class="selall" onclick="A.allOkAll()">${I("checks", 18, 2.4)} Select All</button>
+      <div class="phead">${I("camera", 18)} Photos (${draft.photos.length}/6)</div>
+      <div class="phgrid">${draft.photos.map((ph, i) => `<div class="ph-i"><img src="/api/files/${ph}" onclick="M.lightbox(this.src)" alt=""><button class="rm" onclick="A.rmPhoto(${i})">${I("x", 12, 3)}</button></div>`).join("")}${draft.photos.length < 6 ? `<label class="addph2">${I("camera", 26)}<span>Add Photo</span><input type="file" accept="image/*" onchange="A.chkPhoto(this)"></label>` : ""}</div>
+      <div class="phead" style="margin-top:18px">Signature</div>
+      <button class="sigrow" onclick="A.sheet('sig')">${draft.sig ? `<img src="${draft.sig}" alt="Signature">` : `${I("pen", 18)}<span class="grow">Add Signature</span>`}<span class="chev">${I("chev", 16)}</span></button>` : ""}`;
+    return `<div class="bar"><span style="width:42px"><button class="round" onclick="A.cancel()" aria-label="Back">${I("left", 20, 2.6)}</button></span><div class="ttl">Vehicle Checklist</div><span class="side"><a class="hist" href="#/history" aria-label="Check history">${I("list", 20)}</a></span></div>
+      <div class="body" style="padding-bottom:20px">${body}</div><div class="dock"><button class="btn lg brand block" onclick="A.submit()">Submit</button></div>${tabs()}`;
   }
 
   function itemRow(it) {
     const r = draft.results[it.key] || {};
-    return `<div class="item ${r.s ? "done" : ""}" id="it-${it.key}"><div class="q"><div class="grow"><div class="lbl">${esc(it.label)}</div>${it.trailer ? `<div class="tag">Trailers only</div>` : ""}</div>
-      <div class="tri"><button class="ok ${r.s === "ok" ? "on" : ""}" aria-label="OK" onclick="A.mark('${it.key}','ok')">${I("check", 20, 3)}</button><button class="def ${r.s === "def" ? "on" : ""}" aria-label="Defect" onclick="A.mark('${it.key}','def')">${I("x", 20, 3)}</button>${it.na ? `<button class="na ${r.s === "na" ? "on" : ""}" onclick="A.mark('${it.key}','na')">N/A</button>` : ""}</div></div>
+    const mark = r.s === "ok" ? `<span class="mk ok">${I("check", 18, 3)}</span>` : r.s === "def" ? `<span class="mk def">${I("x", 18, 3)}</span>` : r.s === "na" ? `<span class="mk na">N/A</span>` : `<span class="mk"></span>`;
+    return `<div class="crow ${r.s || ""}" id="it-${it.key}"><div class="ci">${esc(it.label)}${it.trailer ? `<em>Trailers only</em>` : ""}</div><button class="cc" onclick="A.cycle('${it.key}')" aria-label="Checked">${mark}</button><button class="cr" onclick="A.mark('${it.key}','def')">${r.s === "def" ? (r.note ? `<span class="rn">${esc(r.note)}</span>` : `<span class="rn need">Add remark</span>`) : "Remark"}</button></div>
       ${r.s === "def" ? `<div class="defbox"><textarea class="in" placeholder="What's wrong? Where is it?" oninput="A.note('${it.key}',this.value)">${esc(r.note || "")}</textarea>
         <div class="sev"><button class="minor ${r.sev === "minor" ? "on" : ""}" onclick="A.sev('${it.key}','minor')"><b>Minor</b>Safe to drive</button><button class="major ${r.sev === "major" ? "on" : ""}" onclick="A.sev('${it.key}','major')"><b>Major</b>Do not drive</button></div>
-        <div class="photos">${(r.photos || []).map(p => `<div class="ph-i"><img src="/api/files/${p}" onclick="M.lightbox(this.src)" alt=""></div>`).join("")}<label class="addph">${I("camera", 22)}<input type="file" accept="image/*" capture="environment" onchange="A.itemPhoto('${it.key}',this)"></label></div></div>` : ""}</div>`;
+        <div class="photos">${(r.photos || []).map(ph => `<div class="ph-i"><img src="/api/files/${ph}" onclick="M.lightbox(this.src)" alt=""></div>`).join("")}<label class="addph">${I("camera", 22)}<input type="file" accept="image/*" capture="environment" onchange="A.itemPhoto('${it.key}',this)"></label></div></div>` : ""}`;
   }
 
   function checkView(id, q) {
@@ -259,7 +201,7 @@
     const v = X.veh(c.vehicleId), o = M.outcome(c), defs = M.defectsOf(c), secs = M.sectionsFor(v);
     const res = it => M.resultOf(c, it, v);
     const top = q.done ? `<div class="result ${o.res}"><div class="ic">${I(o.res === "ok" ? "check" : "alert", 36, 2.6)}</div><div class="big">${o.res === "ok" ? "Fit to drive" : o.res === "bad" ? "Do not drive" : "Defects reported"}</div><p>${o.res === "ok" ? "Nil defects. Have a safe trip, " + esc(me.name.split(" ")[0]) + "." : o.res === "bad" ? esc(v.fleet) + " is off the road. The workshop has been alerted — contact the office for another vehicle." : "The workshop has a job card for each defect. You can use the vehicle."}</p></div>
-      <a class="btn block lg pri" style="margin:12px 0 4px" href="#/">Done</a>` : "";
+      <a class="btn block lg brand" style="margin:12px 0 4px" href="#/">Done</a>` : "";
     return screen(q.done ? "Check submitted" : "Walk-around check", `${top}
       <div class="card pad" style="margin-top:${q.done ? 12 : 0}px"><div class="vcard">${vTag(v, 1)}<div class="grow"><div style="font-weight:800;font-size:17px">${esc(v.reg)}</div><div class="muted small">${fmtDT(c.at)}</div></div>${pill(o.cls, o.label)}</div>
         <div class="kv" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line2)"><div><span>Driver</span><b>${esc(X.pname(c.driverId))}</b></div><div><span>Odometer</span><b>${km(c.odo)}</b></div><div><span>Reference</span><b>${esc(c.id)}</b></div><div><span>Time taken</span><b>${c.duration || "—"} min</b></div></div>
@@ -272,13 +214,16 @@
   }
 
   function history() {
-    const all = S.checks.filter(c => isoOf(c.at) >= M.addDaysIso(today(), -6));
+    const from = M.addDaysIso(today(), -6), q = ui.hq.toLowerCase();
+    const all = S.checks.filter(c => isoOf(c.at) >= from);
     const tabs3 = [["all", "All", all], ["mine", "Mine", all.filter(c => c.driverId === me.id)], ["def", "With defects", all.filter(c => M.defectsOf(c).length)]];
-    const list = (tabs3.find(t => t[0] === ui.hTab) || tabs3[0])[2].slice().sort((a, b) => b.at - a.at);
-    const byDay = {};
-    list.forEach(c => { (byDay[isoOf(c.at)] = byDay[isoOf(c.at)] || []).push(c); });
-    return screen("Checks", `<div class="chips" style="margin-bottom:4px">${tabs3.map(([k, l, ls]) => `<button class="chip ${ui.hTab === k ? "on" : ""}" onclick="A.htab('${k}')">${l}<span class="c">${ls.length}</span></button>`).join("")}</div>
-      ${Object.keys(byDay).map(d => `<div class="sec"><h3>${fmtDay(d)}</h3></div><div class="card list">${byDay[d].map(checkRow).join("")}</div>`).join("") || `<div class="empty">No checks in the last 7 days.</div>`}`, { back: false, right: meBtn() });
+    const list = (tabs3.find(t => t[0] === ui.hTab) || tabs3[0])[2].filter(c => { const v = X.veh(c.vehicleId) || {}; return !q || (v.reg + " " + v.fleet + " " + X.pname(c.driverId)).toLowerCase().includes(q); }).sort((a, b) => b.at - a.at);
+    return screen("Walk-around Checks", `<div class="search">${I("search", 18)}<input id="hsearch" placeholder="Search…" value="${esc(ui.hq)}" oninput="A.hsearch(this.value)" autocomplete="off"></div>
+      <div class="pills" style="margin-top:12px">${tabs3.map(([k, l, ls]) => `<button class="pl ${ui.hTab === k ? "on" : ""}" onclick="A.htab('${k}')">${l} <span>${ls.length}</span></button>`).join("")}</div>
+      <div class="wkhead"><span>THIS WEEK'S SUBMISSIONS</span><span>${fmtD(from)} – ${fmtD(today())}</span></div>
+      ${list.map(c => { const v = X.veh(c.vehicleId) || { reg: "?", fleet: "?" }, o = M.outcome(c); return `<div class="subcard"><div class="row" style="align-items:flex-start"><div class="grow"><div class="sreg">${esc(v.reg)}</div><div class="swhen">${fmtLong(c.at)}</div></div>${pill(o.cls, o.label)}</div>
+        <div class="row" style="margin-top:10px"><span class="muted">Driver</span><b>${esc(X.pname(c.driverId))}</b><span class="grow"></span><a class="pdfb" href="#/check/${c.id}"><span class="pdfi">PDF</span> View PDF</a></div></div>`; }).join("") || `<div class="empty">No checks match.</div>`}`,
+      { back: "#/", dock: `<a class="newbar" href="#/check/new">+ New Checklist</a>`, noTabs: true });
   }
 
   /* ---------- report a defect ---------- */
@@ -297,34 +242,34 @@
 
   /* ---------- job sheets (mechanics) ---------- */
   function jobsList() {
-    const q = ui.jq.toLowerCase();
-    const prio = { VOR: 0, High: 1, Normal: 2 };
-    let list = S.jobs.filter(j => {
-      const v = X.veh(j.vehicleId);
+    const q = ui.jq.toLowerCase(), prio = { VOR: 0, High: 1, Normal: 2 };
+    const base = S.jobs.filter(j => {
+      const v = X.veh(j.vehicleId) || {};
+      if (ui.jobsWho === "fleet" && M.isExternal(j)) return false;
+      if (ui.jobsWho === "ext" && !M.isExternal(j)) return false;
       return !q || (j.id + " " + j.title + " " + v.fleet + " " + v.reg + " " + j.type + " " + (j.customer || "")).toLowerCase().includes(q);
     });
-    const active = list.filter(j => j.status !== "Complete").sort((a, b) => prio[a.priority] - prio[b.priority] || b.created - a.created);
+    const active = base.filter(j => j.status !== "Complete"), done = base.filter(j => j.status === "Complete");
+    const todayJobs = base.filter(j => j.plan && j.plan.date === today() && (me.role !== "mechanic" || j.mechId === me.id));
     const mine = active.filter(j => j.mechId === me.id);
-    const todayJobs = list.filter(j => j.plan && j.plan.date === today() && (me.role !== "mechanic" || j.mechId === me.id));
-    const done = list.filter(j => j.status === "Complete").sort((a, b) => (b.closedAt || 0) - (a.closedAt || 0));
-    const show = ui.jobsTab === "mine" ? mine : ui.jobsTab === "done" ? done : ui.jobsTab === "today" ? todayJobs : active;
-    return `<div class="bar"><a class="round" href="#/" aria-label="Home">${I("left", 20, 2.4)}</a><div class="ttl">Job sheets</div>${meBtn()}</div>
-      <div class="body">
-        <div class="search">${I("search", 18)}<input id="jsearch" placeholder="Search job cards…" value="${esc(ui.jq)}" oninput="A.jsearch(this.value)" autocomplete="off"></div>
-        <a class="btn go block lg" href="#/job/new" style="margin-top:12px">${I("plus", 20, 2.6)} Create new job card</a>
-        <div class="chips" style="margin:16px 0 12px">${[["today", "Today", todayJobs.length], ["active", "Active", active.length], ["mine", "Mine", mine.length], ["done", "Complete", done.length]].map(([k, l, n]) => `<button class="chip ${ui.jobsTab === k ? "on" : ""}" onclick="A.jtab('${k}')">${l}<span class="c">${n}</span></button>`).join("")}</div>
-        ${show.map(jobCard).join("") || `<div class="empty">No job cards here.</div>`}
-      </div>${tabs()}`;
+    const sets = { all: base, today: todayJobs, mine, active, done };
+    const show = (sets[ui.jobsTab] || base).slice().sort((a, b) => (a.status === "Complete") - (b.status === "Complete") || prio[a.priority] - prio[b.priority] || b.created - a.created);
+    const pl = (k, l, n, fn, cur) => `<button class="pl ${cur === k ? "on" : ""}" onclick="${fn}('${k}')">${l}${n === undefined ? "" : ` <span>${n}</span>`}</button>`;
+    return screen("Job Sheets", `<div class="search">${I("search", 18)}<input id="jsearch" placeholder="Search job cards…" value="${esc(ui.jq)}" oninput="A.jsearch(this.value)" autocomplete="off"></div>
+      <div class="pills" style="margin-top:12px">${pl("all", "All", base.length, "A.jtab", ui.jobsTab)}${pl("today", "Today", todayJobs.length, "A.jtab", ui.jobsTab)}${pl("mine", "Mine", mine.length, "A.jtab", ui.jobsTab)}${pl("active", "Active", active.length, "A.jtab", ui.jobsTab)}${pl("done", "Completed", done.length, "A.jtab", ui.jobsTab)}</div>
+      <div class="pills" style="margin-top:8px">${pl("all", "All Types", undefined, "A.jwho", ui.jobsWho)}<button class="pl ${ui.jobsWho === "fleet" ? "on" : ""}" onclick="A.jwho('fleet')">${I("bus", 14)} Fleet</button><button class="pl ${ui.jobsWho === "ext" ? "on" : ""}" onclick="A.jwho('ext')">${I("folder", 14)} Outside</button></div>
+      <a class="btn lg brand block" href="#/job/new" style="margin-top:14px">+ Create New Job Card</a>
+      <div class="wkhead" style="margin-top:18px"><span>${{ all: "ALL", today: "TODAY'S", mine: "MY", active: "ACTIVE", done: "COMPLETED" }[ui.jobsTab] || "ALL"} JOB CARDS (${show.length})</span></div>
+      ${show.map(jobCard).join("") || `<div class="empty">No job cards here.</div>`}`, { back: "#/" });
   }
   function jobCard(j) {
-    const v = X.veh(j.vehicleId), running = (j.labour || []).some(l => !l.end);
-    return `<a class="jc" href="#/job/${j.id}"><div class="row"><span class="no">#${esc(j.id)}</span>${statusPill(j.status)}<span class="grow"></span><span class="type">${esc(j.type)}</span></div>
-      <div class="ttl">${j.priority === "VOR" && j.status !== "Complete" ? `<span style="color:var(--red)">● VOR</span> ` : ""}${esc(j.title)}</div>
-      <div class="meta"><div><span>Reg no.</span><b>${esc(v.reg)}</b> <span class="muted xs" style="display:inline;font-weight:700;text-transform:none;letter-spacing:0">${esc(v.fleet)}</span></div><div><span>Customer</span><b>${esc(j.customer || "—")}</b>${M.isExternal(j) ? ` <span class="pill blue" style="font-size:10px;padding:1px 6px">Outside</span>` : ""}</div></div>
-      ${j.plan && j.status !== "Complete" ? `<div class="xs" style="margin:-2px 0 8px;font-weight:700;color:${j.plan.date === today() ? "var(--green-ink)" : "var(--muted)"}">${I("calendar", 13)} Planned ${esc(fmtDay(j.plan.date).toLowerCase())} · ${j.plan.hours}h</div>` : ""}
-      <div class="totals"><div><span class="muted">Total hours</span><span class="v">${running ? `<span style="color:var(--green-ink)">● </span>` : ""}${hrs(M.jobMins(j))}</span></div><div><span class="muted">Rate (hourly)</span><span class="v">${eur(j.rate)}</span></div><div><span class="muted">Parts</span><span class="v">${j.noParts ? "None" : eur(M.jobParts(j))}</span></div><div class="g"><span>Grand total</span><span class="v">${eur(M.jobTotal(j))}</span></div></div>
-      ${j.workDone ? `<div class="worknote"><span>Work performed</span>${esc(j.workDone.length > 110 ? j.workDone.slice(0, 107) + "…" : j.workDone)}</div>` : ""}
-      <div class="foot"><span>${fmtD(isoOf(j.created))}</span>${j.mechId ? `<span>· ${esc(X.pname(j.mechId))}</span>` : `<span style="color:var(--amber)">· Unassigned</span>`}${j.docket ? `<span class="row" style="gap:4px;color:var(--green-ink)">${I("file", 14)} Docket</span>` : ""}<span class="grow"></span><span class="row" style="gap:4px;font-weight:800;color:var(--green-ink)">View job ${I("chev", 14, 2.6)}</span></div></a>`;
+    const v = X.veh(j.vehicleId), running = (j.labour || []).some(l => !l.end), ext = M.isExternal(j);
+    const st = j.status === "Complete" ? "done" : j.status === "In progress" ? "prog" : j.status === "Awaiting parts" ? "wait" : "open";
+    return `<div class="jc2"><div class="row" style="gap:8px"><span class="jno">#${esc(j.id)}</span><span class="jtag ${ext ? "ext" : ""}">${I(ext ? "folder" : "bus", 12)} ${esc(j.type)}</span><span class="grow"></span><span class="jst ${st}">${esc(j.status.toLowerCase())}</span></div>
+      <div class="jsub">${esc(v.external ? v.reg : v.fleet + " " + v.reg)} · ${esc(j.customer || "Martley's fleet")} · ${isoOf(j.created)}</div>
+      <div class="jttl">${j.priority === "VOR" && j.status !== "Complete" ? `<span style="color:var(--red)">● VOR</span> ` : ""}${esc(j.title)}</div>
+      ${j.plan && j.status !== "Complete" ? `<div class="xs" style="margin-top:4px;font-weight:700;color:${j.plan.date === today() ? "var(--green-ink)" : "var(--muted)"}">${I("calendar", 13)} Planned ${esc(fmtDay(j.plan.date).toLowerCase())} · ${j.plan.hours}h</div>` : ""}
+      <div class="row" style="margin-top:12px"><span class="${avClass(X.person(j.mechId))} sm">${j.mechId ? initials(X.pname(j.mechId)) : "?"}</span><span class="small">${j.mechId ? esc(X.pname(j.mechId).split(" ")[0]) : `<span style="color:var(--amber);font-weight:700">Unassigned</span>`} · ${running ? `<b style="color:var(--green-ink)">● </b>` : ""}${hrs(M.jobMins(j))}</span><span class="grow"></span><a class="pdfb" href="#/job/${j.id}${j.status === "Complete" ? "?tab=done" : ""}"><span class="pdfi">PDF</span> View PDF</a></div></div>`;
   }
 
   const TABS = [["details", "file", "Details"], ["work", "wrench", "Work done"], ["parts", "box", "Parts"], ["done", "check", "Complete"]];
@@ -414,8 +359,38 @@
         ${body}</div>${dock ? `<div class="dock">${dock}</div>` : ""}`;
   }
 
+  const CERTS = [["licence", "Driving Licence", 1], ["cpc", "Driver CPC Card", 0], ["manual", "Manual Handling", 0], ["safepass", "Safe Pass", 0]];
+  function profile() {
+    const docs = me.docs || {}, since = Date.now() - 30 * 864e5;
+    const myChecks = S.checks.filter(c => c.driverId === me.id && c.at > since);
+    const myHrs = S.jobs.reduce((a, j) => a + (j.labour || []).filter(l => l.mechId === me.id && l.start > since).reduce((b, l) => b + ((l.end || Date.now()) - l.start) / 60000, 0), 0);
+    const shifts = (me.shifts || []).filter(x => x.start > since);
+    const fileRow = (k, label) => { const d = docs[k] || {}; return `<label class="fl">${label}</label><label class="filein"><span class="fb">Choose file</span><span class="fn">${d.file ? `<a href="/api/files/${d.file.id}" target="_blank" onclick="event.stopPropagation()">${esc(d.file.name)}</a>` : "No file chosen"}</span><input type="file" accept="image/*,application/pdf" onchange="A.certFile('${k}',this)"></label>`; };
+    return screen("Profile", `<div class="card pad rec"><h2 class="uh">Employee Record</h2>
+        <div class="row" style="gap:14px;margin-bottom:14px"><span class="${avClass(me)} lg">${initials(me.name)}</span><div><div style="font-weight:800;font-size:19px">${esc(me.name)}</div><div class="muted small">${esc(me.title || M.ROLE[me.role])} · Martley's of Portlaoise</div></div></div>
+        <div class="kvl"><div><span>Phone</span><b>${esc(me.phone || "—")}</b></div><div><span>Licence categories</span><b>${esc(me.licence || "—")}</b></div><div><span>Start date</span><b>${me.joined ? fmtD(me.joined) : "—"}</b></div><div><span>Depot</span><b>Kilminchy, Portlaoise</b></div></div></div>
+      <div class="card pad rec"><h2 class="uh">Last 30 Days</h2><div class="kvl c3"><div><span>Checks</span><b>${myChecks.length}</b></div><div><span>Defects reported</span><b>${myChecks.reduce((a, c) => a + M.defectsOf(c).length, 0)}</b></div><div><span>${me.role === "mechanic" ? "Hours on jobs" : "Shifts"}</span><b>${me.role === "mechanic" ? hrs(myHrs) : shifts.length}</b></div></div></div>
+      ${CERTS.map(([k, label, two]) => { const d = docs[k] || {}, days = d.exp ? M.daysUntil(d.exp) : null; return `<div class="card pad rec"><h2 class="uh">${label}${d.exp ? `<span class="right">${duePill(d.exp)}</span>` : ""}</h2>
+        ${fileRow(k, label + " Document")}
+        <label class="fl">Expiry Date *</label><input type="date" class="in" value="${d.exp || ""}" onchange="A.certExp('${k}',this.value)">${days !== null && days < 0 ? `<div class="xs" style="color:var(--red);margin-top:4px">Expired — upload the renewed ${label.toLowerCase()}.</div>` : ""}
+        ${two ? fileRow(k + "B", "Upload Back of Licence") : ""}</div>`; }).join("")}
+      <button class="btn block lg" style="margin-top:4px;color:var(--red)" onclick="A.logout()">${I("out", 18)} Sign out</button>`, { back: "#/" });
+  }
+
   /* ---------- bottom sheets ---------- */
+  const JOB_KINDS = ["Driving — school run", "Driving — private hire", "Driving — scheduled route", "Workshop", "Yard & cleaning", "Training", "Office"];
   function sheet() {
+    const wrap = (title, body) => `<div class="overlay" onclick="if(event.target===this)A.sheet(null)"><div class="sheet2"><div class="grab"></div><h2 style="font-size:20px;margin-bottom:14px">${title}</h2>${body}</div></div>`;
+    if (ui.sheet === "alerts") { const att = attention(); return wrap("Needs attention", att.length ? `<div class="card list">${att.slice(0, 8).map(j => { const v = X.veh(j.vehicleId); return `<a class="li" href="#/job/${j.id}">${vTag(v)}<div class="grow"><div class="t ellipsis">${esc(j.title)}</div><div class="m">#${esc(j.id)} · ${fmtDT(j.created)}</div></div>${j.priority === "VOR" ? pill("red", "Off road") : pill("amber", "Unassigned")}</a>`; }).join("")}</div>` : `<div class="card pad small">Nothing urgent — no vehicles off road and every job is assigned.</div>`); }
+    if (ui.sheet === "clockout") { const c = me.clock || {}, v = c.vehicleId && X.veh(c.vehicleId); return wrap("Clock Out", `<div class="card pad"><div class="kvl"><div><span>Working on</span><b>${esc(c.type || "—")}</b></div><div><span>Vehicle</span><b>${v ? esc(v.fleet + " · " + v.reg) : "—"}</b></div><div><span>Clocked in</span><b>${c.at ? fmtT(c.at) : "—"}</b></div><div><span>Time today</span><b>${c.at ? `<span data-since="${c.at}">${clockText((Date.now() - c.at) / 1000)}</span>` : "—"}</b></div></div></div>
+      <div class="row" style="margin-top:14px"><button class="btn lg grow" onclick="A.sheet(null)">Cancel</button><button class="btn lg dark grow" onclick="A.clockOut()">Clock Out</button></div>`); }
+    if (ui.sheet === "switch") { const c = me.clock || {}; return wrap("Update Timesheet", `<div class="stack"><div><label class="f">Job type *</label><select class="in dk" id="sw-type">${JOB_KINDS.map(k => `<option ${k === (c.type || (me.role === "mechanic" ? "Workshop" : "")) ? "selected" : ""}>${k}</option>`).join("")}</select></div>
+      <div><label class="f">Vehicle</label><select class="in dk" id="sw-veh"><option value="">No vehicle</option>${S.vehicles.map(v => `<option value="${v.id}" ${v.id === c.vehicleId ? "selected" : ""}>${esc(v.fleet)} · ${esc(v.reg)}</option>`).join("")}</select></div>
+      <div class="xs muted">${me.clock ? "Ends your current entry now and starts a new one." : "You're not clocked in — this clocks you in."}</div></div>
+      <div class="row" style="margin-top:14px"><button class="btn lg grow" onclick="A.sheet(null)">Cancel</button><button class="btn lg brand grow" onclick="A.switchJob()">Submit</button></div>`); }
+    if (ui.sheet === "sig") return wrap("Signature", `<div class="small muted" style="margin-bottom:10px">I confirm I have carried out this walk-around check${draft ? ` on <b style="color:var(--ink)">${esc(X.veh(draft.vehicleId).reg)}</b>` : ""} and the results are accurate.</div>
+      <div class="sigwrap"><canvas data-sig="draft"></canvas><div class="ph">Sign with your finger</div><button class="btn sm soft clr" onclick="A.clearSig('draft')">Clear</button></div>
+      <button class="btn lg brand block" style="margin-top:14px" onclick="A.sheet(null)">Done</button>`);
     if (ui.sheet === "me") return `<div class="overlay" onclick="if(event.target===this)A.sheet(null)"><div class="sheet2"><div class="grab"></div>
       <div style="text-align:center"><div class="${avClass(me)} lg" style="margin:0 auto">${initials(me.name)}</div><h2 style="margin-top:10px;font-size:20px">${esc(me.name)}</h2><div class="muted small">${me.phone ? esc(me.phone) : "Martley&#39;s staff"}</div></div>
       <div class="card list" style="margin-top:16px"><div class="li" style="cursor:default">${I("clip", 18)}<span class="grow">Checks this month</span><b>${S.checks.filter(c => c.driverId === me.id).length}</b></div><div class="li" style="cursor:default">${I("phone", 18)}<span class="grow">Depot</span><b>057 862 0888</b></div></div>
@@ -448,55 +423,93 @@
     try { const r = await Store.upload(f); toast("Added"); return r; } catch (e) { toast(e.message); return null; }
   }
   const job = id => S.jobs.find(x => x.id === id);
-  function nextBtnState() {
-    const v = X.veh(draft.vehicleId), s = M.sectionsFor(v)[draft.step - 1], b = $("#nextbtn");
-    if (b && s) b.disabled = !s.items.every(it => itemDone(draft.results[it.key]));
-  }
+  function nextBtnState() { /* the one-page checklist validates on Submit */ }
   const persist = () => lsSet(LS.draft, draft);
 
   window.A = {
-    pick(id) { pinFor = id; pin = ""; render(); },
-    key(k) {
-      const p = X.person(pinFor);
-      pin = k === "del" ? pin.slice(0, -1) : (pin + k).slice(0, 4);
-      if (pin.length === 4) {
-        if (pin === p.pin) { me = p; lsSet(LS.me, p.id); pinFor = null; pin = ""; go("#/"); render(); return; }
-        pin = ""; render(); $("#pindots").classList.add("shake"); return;
-      }
-      render();
+    login() {
+      const p = X.person($("#luser").value), pin = $("#lpin").value, err = $("#lerr");
+      if (!p) { err.textContent = "Select your name"; return; }
+      if (pin !== p.pin) { err.textContent = "Wrong PIN — try again"; $("#lpin").value = ""; $("#lpin").focus(); return; }
+      me = p; lsSet(LS.me, p.id); go("#/"); render();
     },
+    clockIn() {
+      me.clock = { at: Date.now(), type: me.role === "mechanic" ? "Workshop" : "Driving — scheduled route", vehicleId: null };
+      save(); keep(render); toast("Clocked in at " + fmtT(me.clock.at));
+    },
+    clockOut() {
+      const c = me.clock; if (!c) return;
+      me.shifts = [{ start: c.at, end: Date.now(), type: c.type, vehicleId: c.vehicleId }].concat(me.shifts || []).slice(0, 60);
+      me.clock = null; ui.sheet = null; save(); keep(render); toast("Clocked out · " + mins((Date.now() - c.at) / 60000) + " today");
+    },
+    switchJob() {
+      const type = $("#sw-type").value, vehicleId = $("#sw-veh").value || null, now = Date.now();
+      if (me.clock) me.shifts = [{ start: me.clock.at, end: now, type: me.clock.type, vehicleId: me.clock.vehicleId }].concat(me.shifts || []).slice(0, 60);
+      me.clock = { at: now, type, vehicleId }; ui.sheet = null; save(); keep(render); toast("Timesheet updated · " + type);
+    },
+    async certFile(k, input) { const r = await upload(input); if (r) { me.docs = Object.assign({}, me.docs, { [k]: Object.assign({}, (me.docs || {})[k], { file: { id: r.id, name: r.name } }) }); save(); keep(render); } },
+    certExp(k, v) { me.docs = Object.assign({}, me.docs, { [k]: Object.assign({}, (me.docs || {})[k], { exp: v }) }); save(); keep(render); toast("Expiry date saved"); },
+    pickVeh(vid) {
+      if (draft && Object.keys(draft.results).some(k => !draft.results[k].auto) && vid !== draft.vehicleId && !confirm("Start again on the other vehicle? Answers so far will be cleared.")) return keep(render);
+      if (vid) startDraft(vid); else { draft = null; lsSet(LS.draft, null); }
+      keep(render);
+    },
+    cycle(k) {
+      const it = M.sectionsFor(X.veh(draft.vehicleId)).flatMap(s => s.items).find(x => x.key === k), r = draft.results[k] || {};
+      const order = ["", "ok", "def"].concat(it && it.na ? ["na"] : []);
+      const next = order[(order.indexOf(r.s || "") + 1) % order.length];
+      if (!next) delete draft.results[k]; else return A.mark(k, next);
+      persist(); keep(render);
+    },
+    allOkAll() {
+      M.sectionsFor(X.veh(draft.vehicleId)).forEach(s => s.items.forEach(it => { const r = draft.results[it.key]; if (!r) draft.results[it.key] = { s: "ok" }; }));
+      persist(); keep(render); toast("All items ticked — untick anything you found faulty");
+    },
+    nil() {
+      const defs = Object.keys(draft.results).filter(k => draft.results[k].s === "def");
+      if (defs.length && !confirm("Clear the " + defs.length + " defect" + (defs.length > 1 ? "s" : "") + " you've recorded and mark NIL defects?")) return;
+      M.sectionsFor(X.veh(draft.vehicleId)).forEach(s => s.items.forEach(it => { const r = draft.results[it.key]; if (!r || r.s !== "na") draft.results[it.key] = { s: "ok" }; }));
+      persist(); keep(render);
+    },
+    hsearch(v) { ui.hq = v; render(); const e = $("#hsearch"); e.focus(); e.setSelectionRange(v.length, v.length); },
+    jwho(k) { ui.jobsWho = k; render(); },
     logout() { me = null; ui.sheet = null; lsSet(LS.me, null); go("#/"); render(); },
-    sheet(s) { ui.sheet = s; keep(render); if (s === "part") setTimeout(() => { const e = $("#p-desc"); if (e) e.focus(); }, 50); },
+    sheet(s) { ui.sheet = s; keep(render); sbTone(); if (s === "part") setTimeout(() => { const e = $("#p-desc"); if (e) e.focus(); }, 50); },
 
     search(v) { ui.q = v; render(); const e = $("#vsearch"); e.focus(); e.setSelectionRange(v.length, v.length); },
     odo(val) {
       draft.odo = val.replace(/\D/g, ""); persist();
       const v = X.veh(draft.vehicleId), ok = draft.odo && Number(draft.odo) >= v.odo;
       $("#odoerr").textContent = draft.odo && !ok ? "Lower than the last reading (" + km(v.odo) + ")" : "";
-      $("#nextbtn").disabled = !ok;
     },
     remarks(val) { draft.remarks = val; persist(); },
     step(i) { draft.step = i; persist(); render(); toTop(); },
-    cancel() { if (Object.keys(draft.results).length > 3 && !confirm("Discard this check?")) return; draft = null; lsSet(LS.draft, null); go("#/"); },
+    cancel() { if (draft && Object.keys(draft.results).filter(k => !draft.results[k].auto).length > 3 && !confirm("Discard this check?")) return; draft = null; lsSet(LS.draft, null); go("#/"); },
     mark(k, s) {
       const r = draft.results[k] || {};
       draft.results[k] = s === "def" ? Object.assign({ sev: "minor", photos: [] }, r, { s, auto: 0 }) : { s };
       persist(); keep(render);
-      if (s === "def") { const ta = document.querySelector("#it-" + k + " textarea"); if (ta) ta.focus({ preventScroll: true }); }
+      if (s === "def") { const ta = document.querySelector("#it-" + k + " + .defbox textarea"); if (ta) ta.focus({ preventScroll: true }); }
     },
     allOk(si) {
       const s = M.sectionsFor(X.veh(draft.vehicleId))[si];
       s.items.forEach(it => { const r = draft.results[it.key]; if (!r || (r.s !== "def" && !(r.s === "na"))) draft.results[it.key] = { s: "ok" }; });
       persist(); keep(render); toast("Marked OK — check anything you found faulty");
     },
-    note(k, val) { draft.results[k].note = val; persist(); nextBtnState(); },
+    note(k, val) { draft.results[k].note = val; persist(); const rn = document.querySelector("#it-" + k + " .rn"); if (rn) { rn.textContent = val || "Add remark"; rn.classList.toggle("need", !val); } },
     sev(k, s) { draft.results[k].sev = s; persist(); keep(render); },
     async itemPhoto(k, input) { const r = await upload(input); if (r) { draft.results[k].photos = (draft.results[k].photos || []).concat(r.id); persist(); keep(render); } },
     async chkPhoto(input) { const r = await upload(input); if (r && draft.photos.length < 6) { draft.photos.push(r.id); persist(); keep(render); } },
     rmPhoto(i) { draft.photos.splice(i, 1); persist(); keep(render); },
     clearSig(k) { if (k === "draft") { draft.sig = null; persist(); } else delete sigs[k]; keep(render); },
     submit() {
-      const v = X.veh(draft.vehicleId), at = Date.now();
+      if (!draft) return toast("Select the vehicle first");
+      const v = X.veh(draft.vehicleId), secs = M.sectionsFor(v);
+      if (!draft.odo || Number(draft.odo) < v.odo) { toast("Enter the odometer reading"); const o = $("#odo"); if (o) o.focus(); return; }
+      const missing = secs.flatMap(s => s.items).filter(it => !itemDone(draft.results[it.key]));
+      if (missing.length) { toast(missing.length + " item" + (missing.length > 1 ? "s" : "") + " still to check" + (missing.some(it => (draft.results[it.key] || {}).s === "def") ? " — defects need a remark" : "")); const e = document.getElementById("it-" + missing[0].key); if (e) e.scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+      if (!draft.sig) { toast("Add your signature"); return A.sheet("sig"); }
+      const at = Date.now();
       const id = "WC-" + today().replace(/-/g, "").slice(2) + "-" + v.fleet + "-" + at.toString(36).slice(-3).toUpperCase();
       const results = JSON.parse(JSON.stringify(draft.results));
       Object.entries(results).forEach(([k, r]) => {
@@ -609,7 +622,7 @@
     const d = lsGet(LS.draft); if (d && X.veh(d.vehicleId)) draft = d;
     render();
     Store.onError(() => toast("Couldn't save — check your signal"));
-    const busy = () => { const a = document.activeElement, r = route(); return (r.name === "check" && r.parts[1] === "new") || ui.sheet || (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) || Object.keys(sigs).length > 0; };
+    const busy = () => { const a = document.activeElement, r = route(); return (r.name === "check" && r.parts[1] === "new") || r.name === "profile" || ui.sheet || (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) || Object.keys(sigs).length > 0; };
     Store.poll(busy, s => { S = s; X = M.api(S); keep(render); });
   })();
 })();
