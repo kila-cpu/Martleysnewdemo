@@ -14,8 +14,10 @@
   const LS = { me: "martleys-m-me", draft: "martleys-m-draft" };
 
   const $ = s => document.querySelector(s);
-  const scroller = () => { const s = $("#app > .scr"); return s && s.scrollHeight > s.clientHeight ? s : document.scrollingElement; };
-  const toTop = () => { const s = $("#app > .scr"); if (s) s.scrollTop = 0; window.scrollTo(0, 0); };
+  // On a phone the page itself scrolls; in the desktop phone frame the .body pane does.
+  const panes = () => [$("#app > .scr > .body"), $("#app > .scr")].filter(Boolean);
+  const scroller = () => panes().find(s => s.scrollHeight > s.clientHeight && getComputedStyle(s).overflowY === "auto") || document.scrollingElement;
+  const toTop = () => { panes().forEach(s => { s.scrollTop = 0; }); window.scrollTo(0, 0); };
   function keep(fn) { const s = scroller(), y = s.scrollTop; fn(); const s2 = scroller(); s2.scrollTop = y; }
   const save = () => Store.sync(S);
 
