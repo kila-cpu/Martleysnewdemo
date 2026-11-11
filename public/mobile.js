@@ -9,7 +9,7 @@
   let draft = null;      // walk-around check in progress
   let jobDraft = null;   // new job card (Details tab before it is saved)
   let defDraft = null;   // ad-hoc defect report
-  const ui = { q: "", jobsTab: "all", jobsWho: "all", jq: "", hTab: "all", hq: "", sheet: null };
+  const ui = { q: "", jobsTab: "all", jobsWho: "all", jq: "", hTab: "all", hq: "", sheet: null, sWeek: null, sDay: null, sWho: "all", sq: "", sLoc: "", sLow: false };
   const sigs = {};
   const LS = { me: "martleys-m-me", draft: "martleys-m-draft" };
 
@@ -67,6 +67,8 @@
       case "check": return r.parts[1] === "new" ? checkFlow(r.q) : checkView(r.parts[1], r.q);
       case "history": return history();
       case "profile": return profile();
+      case "schedule": return schedule();
+      case "stock": return stock();
       case "defect": return reportDefect(r.q);
       case "jobs": if (r.q.tab) { ui.jobsTab = r.q.tab; window.history.replaceState(null, "", "#/jobs"); } return jobsList();
       case "job": return r.parts[1] === "new" ? jobNew(r.q) : jobSheet(r.parts[1], r.q.tab || "details");
@@ -125,9 +127,11 @@
         <div class="row" style="margin-top:12px"><a class="btn pri grow" href="#/job/${run.id}?tab=work">Open job sheet</a><button class="btn danger" onclick="A.clock('${run.id}')">${I("stop", 16)} Stop</button></div></div>`;
     }
     return head + `<div class="body home2">${now}<h2 class="qah">Quick Access</h2>
+      ${qa("#/jobs", "wrench", "Job Sheets", mineOpen.length ? mineOpen.length + " assigned to you · " + open.length + " open" : open.length + " open job cards", { badge: mineOpen.length || "" })}
+      ${qa("#/schedule", "calendar", "Workshop Schedule", (() => { const tj = S.jobs.filter(j => j.plan && j.plan.date === today() && j.status !== "Complete"); const mt = tj.filter(j => j.mechId === me.id).length; return tj.length ? tj.length + " planned today" + (mt ? " · " + mt + " yours" : "") : "Nothing planned today"; })())}
+      ${qa("#/stock", "box", "Parts & Stock", (() => { const low = X.stock().filter(M.lowStock).length; return X.stock().length + " parts" + (low ? " · " + low + " low" : " · all in stock"); })(), { badge: X.stock().filter(M.lowStock).length || "" })}
       ${qa("#/check/new", "clip", "Walk-around Checklist", dv ? "Continue check on " + esc(dv.fleet) + " · " + Object.keys(draft.results).length + " items done" : checked ? "Done today at " + fmtT(todays[0].at) + " · " + esc(X.veh(todays[0].vehicleId).fleet) : "Complete before shift")}
       ${qa("#/defect", "alert", "Report a Defect", "Goes straight to the workshop")}
-      ${qa("#/jobs", "wrench", "Job Sheets", mineOpen.length ? mineOpen.length + " assigned to you · " + open.length + " open" : open.length + " open job cards", { badge: mineOpen.length || "" })}
       ${qa("#/history", "list", "Check History", "This week's submissions")}
       ${qa("#/fleet", "bus", "Fleet Status", vor.length ? vor.length + " off road · " + S.vehicles.filter(v => X.checkedToday(v)).length + "/" + S.vehicles.length + " checked" : "Whole fleet available", { badge: vor.length || "" })}
       ${qa("tel:0578620888", "phone", "Call the Depot", "057 862 0888")}
@@ -259,6 +263,7 @@
       <div class="pills" style="margin-top:12px">${pl("all", "All", base.length, "A.jtab", ui.jobsTab)}${pl("today", "Today", todayJobs.length, "A.jtab", ui.jobsTab)}${pl("mine", "Mine", mine.length, "A.jtab", ui.jobsTab)}${pl("active", "Active", active.length, "A.jtab", ui.jobsTab)}${pl("done", "Completed", done.length, "A.jtab", ui.jobsTab)}</div>
       <div class="pills" style="margin-top:8px">${pl("all", "All Types", undefined, "A.jwho", ui.jobsWho)}<button class="pl ${ui.jobsWho === "fleet" ? "on" : ""}" onclick="A.jwho('fleet')">${I("bus", 14)} Fleet</button><button class="pl ${ui.jobsWho === "ext" ? "on" : ""}" onclick="A.jwho('ext')">${I("folder", 14)} Outside</button></div>
       <a class="btn lg brand block" href="#/job/new" style="margin-top:14px">+ Create New Job Card</a>
+      <div class="twobtn"><a href="#/schedule">${I("calendar", 17)} Schedule</a><a href="#/stock">${I("box", 17)} Parts &amp; Stock</a></div>
       <div class="wkhead" style="margin-top:18px"><span>${{ all: "ALL", today: "TODAY'S", mine: "MY", active: "ACTIVE", done: "COMPLETED" }[ui.jobsTab] || "ALL"} JOB CARDS (${show.length})</span></div>
       ${show.map(jobCard).join("") || `<div class="empty">No job cards here.</div>`}`, { back: "#/" });
   }
@@ -318,6 +323,7 @@
       body = `${chk || j.desc ? `<div class="card pad" style="margin-bottom:12px"><div class="row" style="gap:8px;margin-bottom:8px">${I(j.item ? "alert" : "note", 18)}<h2 class="grow">${j.item ? "Reported defect" : "Job description"}</h2>${(def && def.sev) || j.sev ? pill(((def && def.sev) || j.sev) === "major" ? "red" : "amber", ((def && def.sev) || j.sev) === "major" ? "Major" : "Minor") : ""}</div>
           ${j.item ? `<div class="xs muted" style="margin-bottom:6px">${esc(M.itemLabel(j.item))} · ${esc(X.pname(chk ? chk.driverId : j.reportedBy))}, ${fmtDT(chk ? chk.at : j.created)}${chk ? "" : " · reported during the day"}</div>` : ""}<div class="small">${esc(j.desc || "—")}</div>
           ${((def && def.photos) || []).concat(j.reportPhotos || []).length ? `<div class="photos">${((def && def.photos) || []).concat(j.reportPhotos || []).map(p => `<div class="ph-i"><img src="/api/files/${p}" onclick="M.lightbox(this.src)" alt=""></div>`).join("")}</div>` : ""}</div>` : ""}
+        ${locked ? "" : `<div class="card pad schedcard"><div class="row">${I("calendar", 20)}<div class="grow"><b>${j.plan ? "Planned " + esc(fmtDay(j.plan.date).toLowerCase()) + " · " + j.plan.hours + "h" : "Not on the schedule"}</b><div class="xs muted">${j.plan ? (j.mechId ? esc(X.pname(j.mechId)) : "No mechanic yet") : "Add it so it shows on the workshop planner"}</div></div><button class="btn sm brand" onclick="A.sheet('plan:${j.id}')">${j.plan ? "Amend" : "Add"}</button></div></div>`}
         ${detailsForm(j, false)}
         <div class="card pad" style="margin-top:12px"><label class="f">Status</label><div class="chips">${M.STATUSES.filter(s => s !== "Complete").map(s => `<button class="chip ${j.status === s ? "on" : ""}" ${locked ? "disabled" : ""} onclick="A.jf('${j.id}','status','${s}')">${s}</button>`).join("")}</div>
           <label class="f" style="margin-top:14px">Assigned mechanic</label><select class="in" ${locked ? "disabled" : ""} onchange="A.jf('${j.id}','mechId',this.value||null)"><option value="">Unassigned</option>${S.staff.filter(s => s.role === "mechanic").map(m => `<option value="${m.id}" ${m.id === j.mechId ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select></div>`;
@@ -359,6 +365,59 @@
         ${body}</div>${dock ? `<div class="dock">${dock}</div>` : ""}`;
   }
 
+  /* ---------- workshop schedule ---------- */
+  const DAY_H = d => new Date(d + "T12:00").getDay() === 6 ? 4 : 8;
+  const planHrs = js => js.filter(j => j.status !== "Complete").reduce((a, j) => a + (Number(j.plan.hours) || 0), 0);
+  function schedule() {
+    const t = today(), wk = ui.sWeek || M.weekStart(t), days = Array.from({ length: 6 }, (_, i) => M.addDaysIso(wk, i));
+    const day = days.includes(ui.sDay) ? ui.sDay : days.includes(t) ? t : days[0];
+    const onDay = d => S.jobs.filter(j => j.plan && j.plan.date === d && (ui.sWho !== "mine" || j.mechId === me.id));
+    const mechs = S.staff.filter(x => x.role === "mechanic" && (ui.sWho !== "mine" || x.id === me.id));
+    const js = onDay(day), tray = S.jobs.filter(j => j.status !== "Complete" && !j.plan);
+    const group = (mid, name, person) => {
+      const list = js.filter(j => (j.mechId || "") === mid).sort((a, b) => (a.status === "Complete") - (b.status === "Complete") || ({ VOR: 0, High: 1, Normal: 2 })[a.priority] - ({ VOR: 0, High: 1, Normal: 2 })[b.priority]);
+      if (!person && !list.length) return "";
+      const h = planHrs(list), max = DAY_H(day);
+      return `<div class="sgrp"><div class="row sgh"><span class="${person ? avClass(person) : "av"} sm">${person ? initials(name) : "?"}</span><b class="grow">${esc(name)}${person && person.id === me.id ? " (you)" : ""}</b><span class="xs muted">${h}/${max}h</span></div>
+        <div class="sload ${h > max ? "over" : ""}"><i style="width:${Math.min(100, h / max * 100)}%"></i></div>
+        ${list.map(j => schedJob(j)).join("") || `<div class="sempty">Nothing planned</div>`}</div>`;
+    };
+    return screen("Workshop Schedule", `<div class="row wknav"><button class="round2" onclick="A.sweek(-1)" aria-label="Previous week">${I("left", 18, 2.4)}</button><div class="grow" style="text-align:center"><b>Week of ${fmtD(wk)}</b>${wk !== M.weekStart(t) ? `<div><button class="linkbtn" onclick="A.sweek(0)">Back to this week</button></div>` : ""}</div><button class="round2" onclick="A.sweek(1)" aria-label="Next week" style="transform:scaleX(-1)">${I("left", 18, 2.4)}</button></div>
+      <div class="dstrip">${days.map(d => { const n = onDay(d).filter(j => j.status !== "Complete").length; return `<button class="dd ${d === day ? "on" : ""} ${d === t ? "today" : ""}" onclick="A.sday('${d}')"><span>${M.DOW[new Date(d + "T12:00").getDay()]}</span><b>${Number(d.slice(8))}</b><i>${n || ""}</i></button>`; }).join("")}</div>
+      <div class="pills" style="margin-top:12px"><button class="pl ${ui.sWho !== "mine" ? "on" : ""}" onclick="A.swho('all')">Whole workshop</button><button class="pl ${ui.sWho === "mine" ? "on" : ""}" onclick="A.swho('mine')">My jobs</button></div>
+      <button class="btn lg brand block" style="margin-top:14px" onclick="A.sheet('planpick')">+ Add to Schedule</button>
+      <div class="wkhead" style="margin-top:18px"><span>${esc(fmtDay(day).toUpperCase())} · ${fmtD(day).toUpperCase()}</span><span>${js.length} job${js.length === 1 ? "" : "s"}</span></div>
+      ${mechs.map(m => group(m.id, m.name, m)).join("")}${ui.sWho === "mine" ? "" : group("", "Unassigned", null)}
+      <div class="wkhead" style="margin-top:20px"><span>NOT SCHEDULED YET</span><span>${tray.length}</span></div>
+      ${tray.length ? tray.slice(0, 12).map(j => schedJob(j, true)).join("") : `<div class="empty" style="padding:14px">Every open job is on the schedule.</div>`}`, { back: "#/" });
+  }
+  function schedJob(j, unplanned) {
+    const v = X.veh(j.vehicleId), done = j.status === "Complete", run = (j.labour || []).some(l => !l.end);
+    return `<div class="sj2 ${done ? "done" : ""} ${j.priority === "VOR" && !done ? "vor" : ""}"><a class="grow" href="#/job/${j.id}"><div class="row" style="gap:6px"><span class="jtag ${v.external ? "ext" : ""}">${esc(v.external ? v.reg : v.fleet)}</span><b class="xs">#${esc(j.id)}</b>${run ? `<span class="dot green"></span>` : ""}<span class="grow"></span><span class="xs muted">${j.plan ? j.plan.hours + "h" : esc(j.status)}</span></div>
+      <div class="sjt">${esc(j.title)}</div><div class="xs muted">${done ? "Complete" : esc(j.status)}${M.isExternal(j) ? " · " + esc(j.customer) : ""}${unplanned && j.mechId ? " · " + esc(X.pname(j.mechId).split(" ")[0]) : ""}${j.priority === "VOR" && !done ? ` · <b style="color:var(--red)">VOR</b>` : ""}</div></a>
+      ${done ? "" : `<button class="btn sm ${unplanned ? "brand" : ""}" onclick="A.sheet('plan:${j.id}')">${unplanned ? "Add" : "Amend"}</button>`}</div>`;
+  }
+
+  /* ---------- parts & stock ---------- */
+  function stock() {
+    const q = ui.sq.toLowerCase(), locs = X.locations(), all = X.stock();
+    const list = all.filter(p => (!ui.sLoc || p.loc === ui.sLoc) && (!ui.sLow || M.lowStock(p)) && (!q || (p.partNo + " " + p.desc + " " + (p.cat || "") + " " + (p.bin || "")).toLowerCase().includes(q)))
+      .sort((a, b) => locs.findIndex(l => l.id === a.loc) - locs.findIndex(l => l.id === b.loc) || String(a.bin || "").localeCompare(String(b.bin || "")));
+    const low = all.filter(M.lowStock).length;
+    return screen("Parts & Stock", `<div class="search">${I("search", 18)}<input id="ssearch" placeholder="Search part no. or description…" value="${esc(ui.sq)}" oninput="A.ssearch(this.value)" autocomplete="off"></div>
+      <div class="pills" style="margin-top:12px"><button class="pl ${!ui.sLoc ? "on" : ""}" onclick="A.sloc('')">All places <span>${all.length}</span></button>${locs.map(l => `<button class="pl ${ui.sLoc === l.id ? "on" : ""}" onclick="A.sloc('${l.id}')">${esc(l.name)} <span>${all.filter(p => p.loc === l.id).length}</span></button>`).join("")}</div>
+      <div class="pills" style="margin-top:8px"><button class="pl ${ui.sLow ? "on" : ""}" onclick="A.slow()">${I("alert", 14)} Low or out <span>${low}</span></button></div>
+      <button class="btn lg brand block" style="margin-top:14px" onclick="A.sheet('newpart')">+ Add New Part</button>
+      <div class="wkhead" style="margin-top:18px"><span>${ui.sLoc ? esc((X.loc(ui.sLoc) || {}).name || "").toUpperCase() : "ALL STOCK"} (${list.length})</span><span>Tap Book In when a delivery arrives</span></div>
+      ${list.map(stockCard).join("") || `<div class="empty">No parts match.</div>`}
+      ${X.moves().length ? `<div class="wkhead" style="margin-top:20px"><span>RECENT STOCK MOVEMENTS</span></div><div class="card list">${X.moves().slice(0, 8).map(m => { const pt = X.stockItem(m.stockId); return `<div class="li" style="cursor:default"><b class="small" style="width:40px;color:${m.qty < 0 ? "var(--red)" : m.qty > 0 ? "var(--green-ink)" : "var(--muted)"}">${m.qty > 0 ? "+" : ""}${m.qty || "↔"}</b><div class="grow"><div class="t ellipsis" style="font-size:14px">${esc(pt ? pt.desc : "Removed part")}</div><div class="m">${esc(m.why)}${m.jobId ? " · #" + esc(m.jobId) : ""} · ${esc(X.pname(m.by).split(" ")[0])} · ${fmtDT(m.at)}</div></div></div>`; }).join("")}</div>` : ""}`, { back: "#/" });
+  }
+  function stockCard(p) {
+    const l = X.loc(p.loc), out = p.qty <= 0, low = M.lowStock(p);
+    return `<div class="stk"><div class="row" style="align-items:flex-start"><div class="grow"><div class="stkt">${esc(p.desc)}</div><div class="xs muted">${esc(p.partNo)}${p.cat ? " · " + esc(p.cat) : ""} · ${eur(p.cost)} each</div></div><div class="stkq ${out ? "out" : low ? "low" : ""}"><b>${p.qty}</b><span>on hand</span></div></div>
+      <div class="row" style="margin-top:10px"><span class="stkl">${I("pin", 14)} ${esc(l ? l.name : "Unplaced")}${p.bin ? " · " + esc(p.bin) : ""}</span>${M.stockPill(p)}<span class="grow"></span><button class="btn sm brand" onclick="A.sheet('stk:${p.id}')">+ Book In</button></div></div>`;
+  }
+
   const CERTS = [["licence", "Driving Licence", 1], ["cpc", "Driver CPC Card", 0], ["manual", "Manual Handling", 0], ["safepass", "Safe Pass", 0]];
   function profile() {
     const docs = me.docs || {}, since = Date.now() - 30 * 864e5;
@@ -381,6 +440,29 @@
   const JOB_KINDS = ["Driving — school run", "Driving — private hire", "Driving — scheduled route", "Workshop", "Yard & cleaning", "Training", "Office"];
   function sheet() {
     const wrap = (title, body) => `<div class="overlay" onclick="if(event.target===this)A.sheet(null)"><div class="sheet2"><div class="grab"></div><h2 style="font-size:20px;margin-bottom:14px">${title}</h2>${body}</div></div>`;
+    if (ui.sheet === "planpick") { const tray = S.jobs.filter(j => j.status !== "Complete" && !j.plan); return wrap("Add to Schedule", tray.length ? `<div class="xs muted" style="margin-bottom:10px">Pick a job card to put on the planner.</div><div class="card list">${tray.map(j => { const v = X.veh(j.vehicleId); return `<button class="li" style="width:100%;border:0;background:none;text-align:left" onclick="A.sheet('plan:${j.id}')"><span class="jtag ${v.external ? "ext" : ""}">${esc(v.external ? v.reg : v.fleet)}</span><div class="grow"><div class="t ellipsis" style="font-size:14px">${esc(j.title)}</div><div class="m">#${esc(j.id)} · ${esc(j.status)}${j.mechId ? " · " + esc(X.pname(j.mechId).split(" ")[0]) : ""}</div></div><span class="chev">${I("chev", 16)}</span></button>`; }).join("")}</div>` : `<div class="card pad small">Every open job card is already on the schedule.</div>`); }
+    if (String(ui.sheet).startsWith("plan:")) {
+      const j = job(ui.sheet.slice(5)), v = X.veh(j.vehicleId), def = j.plan ? j.plan.date : (ui.sDay && ui.sDay >= today() ? ui.sDay : today());
+      return wrap(j.plan ? "Amend Schedule" : "Add to Schedule", `<div class="card pad" style="margin-bottom:12px"><div class="row" style="gap:8px"><span class="jtag ${v.external ? "ext" : ""}">${esc(v.external ? v.reg : v.fleet)}</span><b>#${esc(j.id)}</b></div><div style="font-weight:700;margin-top:6px">${esc(j.title)}</div></div>
+        <div class="stack"><div class="row" style="gap:10px;align-items:flex-end"><div class="grow"><label class="f">Day *</label><input type="date" class="in dk" id="pl-date" value="${def}"></div><div style="width:110px"><label class="f">Est. hours *</label><input type="number" class="in dk" id="pl-hrs" step="0.5" min="0.5" inputmode="decimal" value="${j.plan ? j.plan.hours : 2}"></div></div>
+          <div><label class="f">Mechanic</label><select class="in dk" id="pl-mech"><option value="">Unassigned</option>${S.staff.filter(x => x.role === "mechanic").map(m => `<option value="${m.id}" ${m.id === (j.mechId || (j.plan ? "" : me.role === "mechanic" ? me.id : "")) ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select></div></div>
+        <div class="row" style="margin-top:16px"><button class="btn lg grow" onclick="A.sheet(null)">Cancel</button><button class="btn lg brand grow" onclick="A.savePlan('${j.id}')">${j.plan ? "Save changes" : "Add to Schedule"}</button></div>
+        ${j.plan ? `<button class="btn block" style="margin-top:10px;color:var(--red)" onclick="A.unplan('${j.id}')">Remove from schedule</button>` : ""}`);
+    }
+    if (String(ui.sheet).startsWith("stk:")) {
+      const pt = X.stockItem(ui.sheet.slice(4)), l = X.loc(pt.loc);
+      return wrap("Book In / Adjust Stock", `<div class="card pad" style="margin-bottom:12px"><div class="row"><div class="grow"><div style="font-weight:800">${esc(pt.desc)}</div><div class="xs muted">${esc(pt.partNo)} · ${I("pin", 12)} ${esc(l ? l.name : "")} ${esc(pt.bin || "")}</div></div><div class="stkq ${pt.qty <= 0 ? "out" : M.lowStock(pt) ? "low" : ""}"><b>${pt.qty}</b><span>on hand</span></div></div></div>
+        <div class="stack"><div><label class="f">How many? (use − to take stock out)</label><div class="row" style="gap:8px"><input type="number" class="in dk" id="adj-qty" step="1" inputmode="numeric" placeholder="e.g. 10" style="flex:1">${[1, 5, 10].map(n => `<button class="btn sm" onclick="const e=document.getElementById('adj-qty');e.value=(Number(e.value)||0)+${n}">+${n}</button>`).join("")}</div></div>
+          <div><label class="f">Reason</label><select class="in dk" id="adj-why">${["Delivery received", "Stock count correction", "Used — not on a job card", "Damaged / returned to supplier"].map(r => `<option>${r}</option>`).join("")}</select></div>
+          <div class="row" style="gap:10px"><div class="grow"><label class="f">Stock place</label><select class="in dk" id="adj-loc">${X.locations().map(x => `<option value="${x.id}" ${x.id === pt.loc ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div><div style="width:120px"><label class="f">Shelf / bin</label><input class="in dk" id="adj-bin" value="${esc(pt.bin || "")}"></div></div></div>
+        <div class="row" style="margin-top:16px"><button class="btn lg grow" onclick="A.sheet(null)">Cancel</button><button class="btn lg brand grow" onclick="A.saveAdj('${pt.id}')">Save</button></div>`);
+    }
+    if (ui.sheet === "newpart") return wrap("Add New Part", `<div class="stack"><div class="row" style="gap:10px"><div class="grow"><label class="f">Part no. *</label><input class="in dk" id="np-no"></div><div class="grow"><label class="f">Category</label><input class="in dk" id="np-cat" placeholder="e.g. Brakes"></div></div>
+        <div><label class="f">Description *</label><input class="in dk" id="np-desc" placeholder="e.g. Brake pad set, rear"></div>
+        <div class="row" style="gap:10px"><div class="grow"><label class="f">Stock place *</label><select class="in dk" id="np-loc">${X.locations().map(x => `<option value="${x.id}" ${x.id === ui.sLoc ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div><div style="width:120px"><label class="f">Shelf / bin</label><input class="in dk" id="np-bin"></div></div>
+        <div class="row" style="gap:10px"><div class="grow"><label class="f">Qty in</label><input type="number" class="in dk" id="np-qty" value="1" inputmode="numeric"></div><div class="grow"><label class="f">Reorder at</label><input type="number" class="in dk" id="np-min" value="1" inputmode="numeric"></div><div class="grow"><label class="f">Cost € each</label><input type="number" class="in dk" id="np-cost" step="0.01" inputmode="decimal"></div></div>
+        <div><label class="f">Supplier</label><input class="in dk" id="np-sup"></div></div>
+      <div class="row" style="margin-top:16px"><button class="btn lg grow" onclick="A.sheet(null)">Cancel</button><button class="btn lg brand grow" onclick="A.saveNewPart()">Add Part</button></div>`);
     if (ui.sheet === "alerts") { const att = attention(); return wrap("Needs attention", att.length ? `<div class="card list">${att.slice(0, 8).map(j => { const v = X.veh(j.vehicleId); return `<a class="li" href="#/job/${j.id}">${vTag(v)}<div class="grow"><div class="t ellipsis">${esc(j.title)}</div><div class="m">#${esc(j.id)} · ${fmtDT(j.created)}</div></div>${j.priority === "VOR" ? pill("red", "Off road") : pill("amber", "Unassigned")}</a>`; }).join("")}</div>` : `<div class="card pad small">Nothing urgent — no vehicles off road and every job is assigned.</div>`); }
     if (ui.sheet === "clockout") { const c = me.clock || {}, v = c.vehicleId && X.veh(c.vehicleId); return wrap("Clock Out", `<div class="card pad"><div class="kvl"><div><span>Working on</span><b>${esc(c.type || "—")}</b></div><div><span>Vehicle</span><b>${v ? esc(v.fleet + " · " + v.reg) : "—"}</b></div><div><span>Clocked in</span><b>${c.at ? fmtT(c.at) : "—"}</b></div><div><span>Time today</span><b>${c.at ? `<span data-since="${c.at}">${clockText((Date.now() - c.at) / 1000)}</span>` : "—"}</b></div></div></div>
       <div class="row" style="margin-top:14px"><button class="btn lg grow" onclick="A.sheet(null)">Cancel</button><button class="btn lg dark grow" onclick="A.clockOut()">Clock Out</button></div>`); }
@@ -473,6 +555,42 @@
     },
     hsearch(v) { ui.hq = v; render(); const e = $("#hsearch"); e.focus(); e.setSelectionRange(v.length, v.length); },
     jwho(k) { ui.jobsWho = k; render(); },
+    // schedule
+    sweek(n) { ui.sWeek = n === 0 ? null : M.addDaysIso(ui.sWeek || M.weekStart(today()), n * 7); ui.sDay = n === 0 ? null : ui.sWeek; render(); },
+    sday(d) { ui.sDay = d; keep(render); },
+    swho(k) { ui.sWho = k; keep(render); },
+    savePlan(id) {
+      const j = job(id), date = $("#pl-date").value, hours = Math.max(0.5, Number($("#pl-hrs").value) || 0);
+      if (!date) return toast("Pick a day");
+      if (!Number($("#pl-hrs").value)) return toast("Enter the estimated hours");
+      const was = j.plan;
+      j.plan = { date, hours }; j.mechId = $("#pl-mech").value || null;
+      ui.sheet = null; ui.sDay = date; ui.sWeek = M.weekStart(date) === M.weekStart(today()) ? null : M.weekStart(date);
+      save(); keep(render); toast((was ? "Moved to " : "Added for ") + fmtDay(date) + (j.mechId ? " · " + X.pname(j.mechId).split(" ")[0] : ""));
+    },
+    unplan(id) { delete job(id).plan; ui.sheet = null; save(); keep(render); toast("Taken off the schedule"); },
+    // stock
+    ssearch(v) { ui.sq = v; render(); const e = $("#ssearch"); e.focus(); e.setSelectionRange(v.length, v.length); },
+    sloc(id) { ui.sLoc = id; keep(render); },
+    slow() { ui.sLow = !ui.sLow; keep(render); },
+    saveAdj(id) {
+      const pt = X.stockItem(id), n = Number($("#adj-qty").value) || 0, loc = $("#adj-loc").value, bin = $("#adj-bin").value.trim();
+      const moved = loc !== pt.loc || bin !== (pt.bin || "");
+      if (!n && !moved) return toast("Enter how many");
+      if (n) { pt.qty = Math.round((pt.qty + n) * 100) / 100; X.moves().unshift({ at: Date.now(), stockId: pt.id, qty: n, by: me.id, why: $("#adj-why").value }); }
+      if (moved) { const from = X.loc(pt.loc); pt.loc = loc; pt.bin = bin; X.moves().unshift({ at: Date.now(), stockId: pt.id, qty: 0, by: me.id, why: from && from.id === loc ? "Moved to shelf " + (bin || "—") + " in " + from.name : "Moved from " + (from ? from.name : "?") + " to " + X.loc(loc).name + (bin ? " · " + bin : "") }); }
+      S.settings.moves = X.moves().slice(0, 300);
+      ui.sheet = null; save(); keep(render); toast(pt.partNo + " · " + pt.qty + " on hand");
+    },
+    saveNewPart() {
+      const partNo = $("#np-no").value.trim().toUpperCase(), desc = $("#np-desc").value.trim();
+      if (!partNo || !desc) return toast("Part no. and description are needed");
+      if (X.stock().some(x => x.partNo === partNo)) return toast(partNo + " is already in stock — use Book In");
+      const pt = { id: "st" + Date.now().toString(36), partNo, desc, cat: $("#np-cat").value.trim(), loc: $("#np-loc").value, bin: $("#np-bin").value.trim(), qty: Number($("#np-qty").value) || 0, min: Number($("#np-min").value) || 0, cost: Number($("#np-cost").value) || 0, supplier: $("#np-sup").value.trim() };
+      X.stock().push(pt);
+      if (pt.qty) X.moves().unshift({ at: Date.now(), stockId: pt.id, qty: pt.qty, by: me.id, why: "New part added" });
+      ui.sheet = null; ui.sq = ""; ui.sLoc = pt.loc; save(); keep(render); toast(desc + " added to stock");
+    },
     logout() { me = null; ui.sheet = null; lsSet(LS.me, null); go("#/"); render(); },
     sheet(s) { ui.sheet = s; keep(render); sbTone(); if (s === "part") setTimeout(() => { const e = $("#p-desc"); if (e) e.focus(); }, 50); },
 
