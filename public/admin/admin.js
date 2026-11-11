@@ -254,7 +254,7 @@
     const list = ui.defTab === "open" ? open : ui.defTab === "fixed" ? fixed : all;
     const age = d => Math.floor((Date.now() - d.at) / 864e5);
     return `<div class="head"><div class="grow"><h1>Defects</h1><div class="sub">Defects reported by drivers, from walk-around checks or during the day, and their repair status</div></div></div>
-      <div class="grid g4" style="margin-bottom:16px">
+      <div class="grid g2" style="margin-bottom:16px">
         <div class="card kpi ${open.length ? "amber" : "green"}"><div class="l">Outstanding</div><div class="n">${open.length}</div></div>
         <div class="card kpi ${open.filter(d => d.sev === "major").length ? "red" : ""}"><div class="l">Major (vehicle off road)</div><div class="n">${open.filter(d => d.sev === "major").length}</div></div>
         <div class="card kpi green"><div class="l">Rectified (all time)</div><div class="n">${fixed.length}</div></div>
@@ -279,7 +279,7 @@
       <div class="filters"><div class="seg">${[["all", "All work", everyone.length], ["fleet", "Martley's fleet", everyone.length - ext.length], ["ext", "Outside customers", ext.length]].map(([k, l, n]) => `<button class="${ui.jobWho === k ? "on" : ""}" onclick="A.set('jobWho','${k}')">${l}<span class="c">${n}</span></button>`).join("")}</div>
         <div class="seg">${tabs.map(([k, l, ls]) => `<button class="${ui.jobTab === k ? "on" : ""}" onclick="A.set('jobTab','${k}')">${l}<span class="c">${ls.length}</span></button>`).join("")}</div><div class="search right">${I("search", 16)}<input id="q" placeholder="Search job no., reg, customer…" value="${esc(ui.jq)}" oninput="A.jsearch(this.value)"></div></div>
       <div class="card tscroll"><table class="t"><thead><tr><th>Job no.</th><th>Raised</th><th>Vehicle</th><th>Job</th><th>Customer</th><th>Planned</th><th>Mechanic</th><th class="num">Hours</th><th class="num">Parts</th><th class="num">Total</th><th>Status</th></tr></thead><tbody>
-        ${list.map(j => { const v = X.veh(j.vehicleId), run = (j.labour || []).some(l => !l.end), c = X.custOf(j); return `<tr class="click" onclick="location.hash='#/job/${j.id}'"><td><b>#${esc(j.id)}</b></td><td class="small mono" style="white-space:nowrap">${fmtD(isoOf(j.created))}</td><td><div class="row">${vTag(v)}<span class="reg">${esc(v.reg)}</span></div></td><td style="max-width:280px"><div class="ellipsis" style="font-weight:600">${esc(j.title)}</div><div class="xs muted">${esc(j.type)}</div>${j.status !== "Complete" && j.priority !== "Normal" ? `<div style="margin-top:3px">${prioPill(j.priority)}</div>` : ""}</td><td class="small">${c.internal ? `<span class="muted">Martley's fleet</span>` : `<a href="#/customer/${c.id}" onclick="event.stopPropagation()" style="font-weight:700">${esc(c.name)}</a>${j.xero ? `<div class="xs muted">${esc(j.xero.no)} · ${esc(j.xero.status)}</div>` : ""}`}</td><td class="small" style="white-space:nowrap">${j.plan ? fmtDay(j.plan.date) + `<div class="xs muted">${j.plan.hours}h est.</div>` : j.status === "Complete" ? `<span class="muted">—</span>` : `<span class="muted">Not planned</span>`}</td><td class="small">${j.mechId ? `<div class="row" style="gap:6px"><span class="av mech sm">${initials(X.pname(j.mechId))}</span>${esc(X.pname(j.mechId))}</div>` : `<span style="color:var(--amber);font-weight:700">Unassigned</span>`}</td><td class="num">${run ? `<span class="dot green" title="On the clock"></span> ` : ""}${hrs(M.jobMins(j))}</td><td class="num">${eur(M.jobParts(j))}</td><td class="num"><b>${eur(M.jobTotal(j))}</b></td><td>${statusPill(j.status)}</td></tr>`; }).join("") || `<tr><td colspan="11" class="empty">No job cards here.</td></tr>`}
+        ${list.map(j => { const v = X.veh(j.vehicleId), run = (j.labour || []).some(l => !l.end), c = X.custOf(j); return `<tr class="click" onclick="location.hash='#/job/${j.id}'"><td><b>#${esc(j.id)}</b></td><td class="small mono" style="white-space:nowrap">${fmtD(isoOf(j.created))}</td><td><div class="row">${vTag(v)}<span class="reg">${esc(v.reg)}</span></div></td><td style="max-width:280px"><div class="ellipsis" style="font-weight:600">${esc(j.title)}</div><div class="xs muted">${esc(j.type)}</div>${j.status !== "Complete" && j.priority !== "Normal" ? `<div style="margin-top:3px">${prioPill(j.priority)}</div>` : ""}</td><td class="small">${c.internal ? `<span class="muted">Martley's fleet</span>` : `<a href="#/customer/${c.id}" onclick="event.stopPropagation()" style="font-weight:700">${esc(c.name)}</a>`}</td><td class="small" style="white-space:nowrap">${j.plan ? fmtDay(j.plan.date) + `<div class="xs muted">${j.plan.hours}h est.</div>` : j.status === "Complete" ? `<span class="muted">—</span>` : `<span class="muted">Not planned</span>`}</td><td class="small">${j.mechId ? `<div class="row" style="gap:6px"><span class="av mech sm">${initials(X.pname(j.mechId))}</span>${esc(X.pname(j.mechId))}</div>` : `<span style="color:var(--amber);font-weight:700">Unassigned</span>`}</td><td class="num">${run ? `<span class="dot green" title="On the clock"></span> ` : ""}${hrs(M.jobMins(j))}</td><td class="num">${eur(M.jobParts(j))}</td><td class="num"><b>${eur(M.jobTotal(j))}</b></td><td>${statusPill(j.status)}</td></tr>`; }).join("") || `<tr><td colspan="11" class="empty">No job cards here.</td></tr>`}
       </tbody>${list.length ? `<tfoot><tr><td colspan="7">${list.length} job card${list.length > 1 ? "s" : ""}</td><td class="num">${hrs(sum(M.jobMins))}</td><td class="num">${eur(sum(M.jobParts))}</td><td class="num">${eur(sum(M.jobTotal))}</td><td></td></tr></tfoot>` : ""}</table></div>`;
   }
 
@@ -330,7 +330,6 @@
             ${done ? `<div class="muted small">${j.plan ? "Was planned for " + fmtDay(j.plan.date) + " · " + j.plan.hours + "h" : "Not planned."}</div>`
             : `<div class="grid g2" style="gap:12px"><div><label class="f">Planned day</label><input type="date" class="in" value="${j.plan ? j.plan.date : ""}" onchange="A.plan('${j.id}','date',this.value)"></div><div><label class="f">Estimated hours</label><input type="number" step="0.5" min="0.5" class="in" value="${j.plan ? j.plan.hours : ""}" placeholder="e.g. 2" onchange="A.plan('${j.id}','hours',this.value)"></div></div>
               <div class="xs muted" style="margin-top:8px">${j.plan ? `On ${esc(j.mechId ? X.pname(j.mechId) : "the unassigned row")}'s list for ${fmtDay(j.plan.date).toLowerCase()} — shows on the workshop screen.` : "Pick a day to put this on the workshop planner."}</div>`}</div>
-          ${ext ? xeroCard(j, cust) : ""}
           <div class="card pad"><h2 style="margin-bottom:10px">Costs</h2><div class="totals">
             <div><span class="muted">Total hours</span><span class="v">${hrs(M.jobMins(j))}</span></div>
             <div><span class="muted">Rate (hourly)</span><span class="v">${done ? eur(j.rate) : `<input type="number" step="0.5" class="in" style="width:100px;padding:4px 8px;text-align:right" value="${j.rate}" onchange="A.jf('${j.id}','rate',Number(this.value)||0)">`}</span></div>
@@ -455,18 +454,6 @@
           ${side("Low stock", X.stock().filter(M.lowStock), p => `<div class="tvli"><b>${p.qty}</b> ${esc(p.desc)}</div>`)}</aside></div></div>`;
   }
 
-  /* ---------- Xero ---------- */
-  function xeroCard(j, c) {
-    const xs = (S.settings || {}).xero || {}, x = j.xero;
-    const stPill = s => pill(s === "Paid" ? "green" : s === "Draft" ? "" : "amber", esc(s));
-    return `<div class="card pad noprint"><div class="row" style="margin-bottom:10px"><span class="xero">x</span><h2 class="grow">Xero invoice</h2>${x ? stPill(x.status) : ""}</div>
-      ${x ? `<div class="kv c2"><div><span>Invoice</span><b>${esc(x.no)}</b></div><div><span>Amount</span><b>${eur(x.total)}</b></div><div><span>Sent</span><b>${fmtDT(x.at)}</b></div><div><span>By</span><b>${esc(X.pname(x.by))}</b></div></div>
-          <div class="row" style="margin-top:12px;gap:8px"><button class="btn sm" onclick="A.xeroOpen('${j.id}')">${I("external", 14)} View in Xero</button><button class="btn sm ghost" onclick="A.xeroSync('${j.id}')">${I("refresh", 14)} Check status</button></div>`
-      : !xs.connected ? `<div class="muted small">Xero isn't connected. <a href="#/settings" style="text-decoration:underline">Connect it in Settings</a>.</div>`
-      : j.status !== "Complete" ? `<div class="muted small">Once this job card is signed off you can send it to Xero as an invoice for <b>${esc(c.name)}</b> — labour and parts as separate lines.</div>`
-      : `<div class="small" style="margin-bottom:10px">Ready to invoice <b>${esc(c.name)}</b> for <b>${eur(M.jobTotal(j))}</b>${c.terms ? ` · ${esc(c.terms)} terms` : ""}.</div><button class="btn pri" style="width:100%" onclick="A.xero('${j.id}')">${I("send", 15)} Send invoice to Xero</button>`}</div>`;
-  }
-
   /* ---------- parts & stock ---------- */
   function partsPage() {
     const all = X.stock(), locs = X.locations(), q = ui.partQ.toLowerCase();
@@ -495,24 +482,20 @@
   }
 
   /* ---------- customers ---------- */
-  const billed = js => js.filter(j => j.status === "Complete").reduce((a, j) => a + M.jobTotal(j), 0);
-  const owed = js => js.filter(j => j.xero && j.xero.status !== "Paid").reduce((a, j) => a + j.xero.total, 0);
   function customersPage() {
     const q = ui.custQ.toLowerCase();
     const list = X.customers().filter(c => !q || (c.name + " " + (c.contact || "") + " " + (c.phone || "") + " " + (c.vehicles || []).map(v => v.reg).join(" ")).toLowerCase().includes(q))
       .sort((a, b) => (b.internal ? 1 : 0) - (a.internal ? 1 : 0) || a.name.localeCompare(b.name));
     const ext = X.customers().filter(c => !c.internal), extJobs = S.jobs.filter(M.isExternal);
-    return `<div class="head"><div class="grow"><h1>Customers</h1><div class="sub">A digital file for every customer — open one to see all of their vehicles, job cards and invoices</div></div>
+    return `<div class="head"><div class="grow"><h1>Customers</h1><div class="sub">A digital file for every customer — open one to see all of their vehicles and job cards</div></div>
         <div class="search">${I("search", 16)}<input id="q" placeholder="Search name, contact, reg…" value="${esc(ui.custQ)}" oninput="A.csearch(this.value)"></div><button class="btn pri" onclick="A.custModal()">${I("plus", 16)} Add customer</button></div>
       <div class="grid g4" style="margin-bottom:16px">
         <div class="card kpi"><div class="l">Outside customers</div><div class="n">${ext.length}</div><div class="s">${ext.reduce((a, c) => a + (c.vehicles || []).length, 0)} vehicles on file</div></div>
-        <div class="card kpi"><div class="l">Open outside jobs</div><div class="n">${extJobs.filter(j => j.status !== "Complete").length}</div><div class="s">${extJobs.length} job cards all time</div></div>
-        <div class="card kpi green"><div class="l">Billed to customers</div><div class="n" style="font-size:24px">${eur(billed(extJobs))}</div><div class="s">completed outside work</div></div>
-        <div class="card kpi ${owed(extJobs) ? "amber" : ""}"><div class="l">Awaiting payment</div><div class="n" style="font-size:24px">${eur(owed(extJobs))}</div><div class="s">per Xero</div></div></div>
-      <div class="card tscroll"><table class="t"><thead><tr><th>Customer</th><th>Contact</th><th class="num">Vehicles</th><th class="num">Open jobs</th><th class="num">All jobs</th><th>Last job</th><th class="num">Billed</th><th class="num">Outstanding</th><th>Xero</th></tr></thead><tbody>
+        <div class="card kpi"><div class="l">Open outside jobs</div><div class="n">${extJobs.filter(j => j.status !== "Complete").length}</div><div class="s">${extJobs.length} job cards all time</div></div></div>
+      <div class="card tscroll"><table class="t"><thead><tr><th>Customer</th><th>Contact</th><th class="num">Vehicles</th><th class="num">Open jobs</th><th class="num">All jobs</th><th>Last job</th></tr></thead><tbody>
         ${list.map(c => { const js = X.custJobs(c), last = js.slice().sort((a, b) => b.created - a.created)[0]; return `<tr class="click" onclick="location.hash='#/customer/${c.id}'"><td><div class="row"><span class="custav ${c.internal ? "int" : ""}">${initials(c.name)}</span><div><b>${esc(c.name)}</b><div class="xs muted">${c.internal ? "Internal — Martley's own vehicles" : esc(c.address || "")}</div></div></div></td>
           <td class="small">${esc(c.contact || "—")}<div class="xs muted">${esc(c.phone || "")}</div></td><td class="num">${c.internal ? S.vehicles.length : (c.vehicles || []).length}</td><td class="num">${js.filter(j => j.status !== "Complete").length || `<span class="muted">—</span>`}</td><td class="num">${js.length}</td>
-          <td class="small">${last ? fmtD(isoOf(last.created)) : "—"}</td><td class="num">${eur(billed(js))}</td><td class="num">${owed(js) ? `<b style="color:var(--amber)">${eur(owed(js))}</b>` : `<span class="muted">—</span>`}</td><td>${c.internal ? `<span class="muted xs">n/a</span>` : c.xero ? pill("green", "Linked") : pill("", "Not linked")}</td></tr>`; }).join("") || `<tr><td colspan="9" class="empty">No customers match.</td></tr>`}
+          <td class="small">${last ? fmtD(isoOf(last.created)) : "—"}</td></tr>`; }).join("") || `<tr><td colspan="6" class="empty">No customers match.</td></tr>`}
       </tbody></table></div>`;
   }
   function customerPage(id) {
@@ -520,30 +503,26 @@
     if (!c) return `<div class="empty">Customer not found. <a href="#/customers">All customers</a></div>`;
     const js = X.custJobs(c).sort((a, b) => (a.status === "Complete") - (b.status === "Complete") || b.created - a.created);
     const docs = js.flatMap(j => (j.docket ? [{ j, id: j.docket.id, name: j.docket.name, kind: "Docket" }] : []).concat((j.photos || []).map(p => ({ j, id: p, kind: "Photo" }))));
-    const invoices = js.filter(j => j.xero);
     const vehs = c.internal ? S.vehicles : (c.vehicles || []);
     return `<a class="crumb" href="#/customers">${I("left", 14)} Customers</a>
-      <div class="head"><div class="row grow" style="gap:14px"><span class="custav lg ${c.internal ? "int" : ""}">${initials(c.name)}</span><div><div class="row" style="gap:8px;margin-bottom:4px">${c.internal ? pill("dark", "Internal") : pill("blue", "Outside customer")}${!c.internal && c.xero ? pill("green", "Xero contact linked") : ""}</div><h1>${esc(c.name)}</h1><div class="sub">${esc(c.contact || "")}${c.phone ? " · " + esc(c.phone) : ""}${c.email ? " · " + esc(c.email) : ""}</div></div></div>
+      <div class="head"><div class="row grow" style="gap:14px"><span class="custav lg ${c.internal ? "int" : ""}">${initials(c.name)}</span><div><div class="row" style="gap:8px;margin-bottom:4px">${c.internal ? pill("dark", "Internal") : pill("blue", "Outside customer")}</div><h1>${esc(c.name)}</h1><div class="sub">${esc(c.contact || "")}${c.phone ? " · " + esc(c.phone) : ""}${c.email ? " · " + esc(c.email) : ""}</div></div></div>
         ${c.internal ? "" : `<button class="btn" onclick="A.custModal('${c.id}')">${I("pen", 16)} Edit</button>`}<button class="btn pri" onclick="A.newJob(null,'${c.id}')">${I("wrench", 16)} New job card</button></div>
-      <div class="grid g5">
+      <div class="grid g3">
         <div class="card kpi"><div class="l">Job cards</div><div class="n">${js.length}</div><div class="s">all time</div></div>
         <div class="card kpi ${js.some(j => j.status !== "Complete") ? "blue" : ""}"><div class="l">Open now</div><div class="n">${js.filter(j => j.status !== "Complete").length}</div><div class="s">${js.filter(j => j.status !== "Complete" && j.plan).length} on the planner</div></div>
-        <div class="card kpi"><div class="l">${c.internal ? "Workshop spend" : "Billed"}</div><div class="n" style="font-size:22px">${eur(billed(js))}</div><div class="s">completed jobs</div></div>
-        <div class="card kpi ${owed(js) ? "amber" : ""}"><div class="l">Outstanding</div><div class="n" style="font-size:22px">${c.internal ? "—" : eur(owed(js))}</div><div class="s">${c.internal ? "internal work" : invoices.length + " invoice" + (invoices.length === 1 ? "" : "s") + " in Xero"}</div></div>
-        <div class="card kpi"><div class="l">Customer since</div><div class="n" style="font-size:22px">${c.since ? fmtD(c.since) : "—"}</div><div class="s">${esc(c.terms ? c.terms + " terms" : "")}</div></div></div>
+        <div class="card kpi"><div class="l">Customer since</div><div class="n" style="font-size:22px">${c.since ? fmtD(c.since) : "—"}</div><div class="s">${c.internal ? "" : (c.vehicles || []).length + " vehicle" + ((c.vehicles || []).length === 1 ? "" : "s") + " on file"}</div></div></div>
       <div class="grid g21" style="margin-top:16px;align-items:start">
         <div class="stack">
-          <div class="card"><div class="ch"><h2>All work</h2><span class="right muted small">${js.length} job card${js.length === 1 ? "" : "s"}</span></div><div class="tscroll"><table class="t"><thead><tr><th>Job no.</th><th>Raised</th><th>Vehicle</th><th>Job</th><th class="num">Total</th><th>Invoice</th><th>Status</th></tr></thead><tbody>
-            ${js.map(j => { const v = X.veh(j.vehicleId); return `<tr class="click" onclick="location.hash='#/job/${j.id}'"><td><b>#${esc(j.id)}</b></td><td class="small mono">${fmtD(isoOf(j.created))}</td><td><span class="reg">${esc(v ? v.reg : "—")}</span></td><td style="max-width:260px"><div class="ellipsis" style="font-weight:600">${esc(j.title)}</div><div class="xs muted">${esc(j.type)}${j.plan && j.status !== "Complete" ? " · planned " + fmtDay(j.plan.date).toLowerCase() : ""}</div></td><td class="num"><b>${eur(M.jobTotal(j))}</b></td><td class="small">${j.xero ? `${esc(j.xero.no)}<div class="xs muted">${esc(j.xero.status)}</div>` : c.internal ? `<span class="muted">—</span>` : j.status === "Complete" ? `<span style="color:var(--amber);font-weight:700">Not sent</span>` : `<span class="muted">—</span>`}</td><td>${statusPill(j.status)}</td></tr>`; }).join("") || `<tr><td colspan="7" class="empty">No job cards yet.</td></tr>`}
+          <div class="card"><div class="ch"><h2>All work</h2><span class="right muted small">${js.length} job card${js.length === 1 ? "" : "s"}</span></div><div class="tscroll"><table class="t"><thead><tr><th>Job no.</th><th>Raised</th><th>Vehicle</th><th>Job</th><th>Status</th></tr></thead><tbody>
+            ${js.map(j => { const v = X.veh(j.vehicleId); return `<tr class="click" onclick="location.hash='#/job/${j.id}'"><td><b>#${esc(j.id)}</b></td><td class="small mono">${fmtD(isoOf(j.created))}</td><td><span class="reg">${esc(v ? v.reg : "—")}</span></td><td style="max-width:260px"><div class="ellipsis" style="font-weight:600">${esc(j.title)}</div><div class="xs muted">${esc(j.type)}${j.plan && j.status !== "Complete" ? " · planned " + fmtDay(j.plan.date).toLowerCase() : ""}</div></td><td>${statusPill(j.status)}</td></tr>`; }).join("") || `<tr><td colspan="5" class="empty">No job cards yet.</td></tr>`}
           </tbody></table></div></div>
           <div class="card pad"><h2 style="margin-bottom:10px">Dockets &amp; photos</h2>${docs.length ? `<div class="docgrid">${docs.map(d => d.kind === "Photo" ? `<figure><img src="/api/files/${d.id}" onclick="M.lightbox(this.src)" alt=""><figcaption>#${esc(d.j.id)}</figcaption></figure>` : `<a class="doc" href="/api/files/${d.id}" target="_blank">${I("file", 22)}<span class="ellipsis">${esc(d.name)}</span><em>#${esc(d.j.id)}</em></a>`).join("")}</div>` : `<div class="muted small">Dockets and photos added to this customer's job cards are kept here.</div>`}</div>
         </div>
         <div class="stack">
-          <div class="card pad"><h2 style="margin-bottom:10px">Details</h2><div class="kv c1"><div><span>Contact</span><b>${esc(c.contact || "—")}</b></div><div><span>Phone</span><b>${esc(c.phone || "—")}</b></div><div><span>Email</span><b>${esc(c.email || "—")}</b></div><div><span>Address</span><b>${esc(c.address || "—")}</b></div>${c.internal ? "" : `<div><span>Payment terms</span><b>${esc(c.terms || "—")}</b></div>`}</div></div>
+          <div class="card pad"><h2 style="margin-bottom:10px">Details</h2><div class="kv c1"><div><span>Contact</span><b>${esc(c.contact || "—")}</b></div><div><span>Phone</span><b>${esc(c.phone || "—")}</b></div><div><span>Email</span><b>${esc(c.email || "—")}</b></div><div><span>Address</span><b>${esc(c.address || "—")}</b></div></div></div>
           <div class="card"><div class="ch"><h2>Vehicles</h2><span class="muted small">${vehs.length}</span>${c.internal ? `<a class="right btn sm ghost" href="#/fleet">Fleet ${I("chev", 14)}</a>` : `<button class="right btn sm" onclick="A.cvModal('${c.id}')">${I("plus", 14)} Add vehicle</button>`}</div>
             ${vehs.length ? `<div class="list">${vehs.slice(0, c.internal ? 6 : 50).map(v => { const vj = js.filter(j => j.vehicleId === v.id); return `<a class="li" href="${c.internal ? "#/vehicle/" + v.id : "javascript:void 0"}" ${c.internal ? "" : `onclick="A.newJob(null,'${c.id}','${v.id}')"`}><span class="reg">${esc(v.reg)}</span><div class="grow"><div class="t ellipsis">${esc(v.model || "")}</div><div class="m">${esc(v.type || "")} · ${vj.length} job${vj.length === 1 ? "" : "s"}</div></div>${c.internal ? `<span class="muted">${I("chev", 16)}</span>` : `<span class="xs muted">New job ${I("plus", 12)}</span>`}</a>`; }).join("")}${c.internal && vehs.length > 6 ? `<a class="li" href="#/fleet"><span class="muted small">+ ${vehs.length - 6} more in the fleet list</span></a>` : ""}</div>` : `<div class="empty">No vehicles on file yet.</div>`}</div>
           <div class="card pad"><h2 style="margin-bottom:10px">Notes</h2><textarea class="in" placeholder="Anything the workshop should know about this customer…" onchange="A.custNote('${c.id}',this.value)">${esc(c.notes || "")}</textarea></div>
-          ${c.internal ? "" : `<div class="card pad"><div class="row" style="margin-bottom:10px"><span class="xero">x</span><h2 class="grow">Xero</h2>${c.xero ? pill("green", "Linked") : pill("", "Not linked")}</div><div class="small muted" style="margin-bottom:10px">${c.xero ? `Invoices for ${esc(c.name)} go to their Xero contact. ${invoices.length} sent, ${eur(owed(js))} awaiting payment.` : "Link this customer to a Xero contact so their job cards can be invoiced."}</div><button class="btn sm" onclick="A.custXero('${c.id}')">${c.xero ? "Unlink" : I("link", 14) + " Link to Xero contact"}</button></div>`}
         </div></div>`;
   }
 
@@ -563,10 +542,6 @@
     return `<div class="head"><div class="grow"><h1>Settings</h1><div class="sub">Workshop defaults and company details used on printed job cards</div></div></div>
       <div class="grid g2" style="align-items:start">
         <div class="card pad stack"><h2>Workshop</h2><div><label class="f">Default labour rate (€ per hour)</label><input class="in" type="number" step="0.5" value="${st.rate || 55}" onchange="A.setting('rate',Number(this.value)||0)" style="max-width:200px"><div class="xs muted" style="margin-top:6px">Used for new job cards. Existing cards keep their own rate.</div></div></div>
-        ${(() => { const x = st.xero || {}, n = S.jobs.filter(j => j.xero).length; return `<div class="card pad stack"><div class="row"><span class="xero">x</span><h2 class="grow">Xero</h2>${x.connected ? pill("green", "Connected") : pill("", "Not connected")}</div>
-          ${x.connected ? `<div class="kv c2"><div><span>Organisation</span><b>${esc(x.org)}</b></div><div><span>Connected</span><b>${fmtD(isoOf(x.since))}</b></div><div><span>Invoices sent</span><b>${n}</b></div><div><span>Next invoice no.</span><b>INV-${String(x.nextInv || 1).padStart(4, "0")}</b></div></div>` : ""}
-          <div class="small muted">Completed job cards for outside customers are sent to Xero as invoices, with labour and each part as separate lines. Customers are matched to Xero contacts; payment status comes back automatically.</div>
-          <div><button class="btn ${x.connected ? "" : "pri"}" onclick="A.xeroConn()">${x.connected ? "Disconnect" : I("link", 15) + " Connect to Xero"}</button></div></div>`; })()}
         <div class="card pad stack"><h2>Company</h2><div class="kv c2"><div><span>Name</span><b>Martley's of Portlaoise</b></div><div><span>Phone</span><b>057 862 0888</b></div><div><span>Depot</span><b>Kilminchy, Dublin Road, Portlaoise, Co. Laois R32 CPA4</b></div><div><span>Email</span><b>info@martleys.com</b></div></div></div>
         <div class="card pad"><h2 style="margin-bottom:10px">Walk-around checklist</h2><div class="small muted" style="margin-bottom:10px">${M.SECTIONS.reduce((a, s) => a + s.items.length, 0)} items in ${M.SECTIONS.length} sections. Trailer-only items start as N/A; wheelchair and school-bus items only show on those vehicles.</div>${M.SECTIONS.map(s => `<div class="secttl">${esc(s.name)} · ${s.items.length}</div>`).join("")}</div>
       </div>`;
@@ -599,8 +574,7 @@
       ok = `<button class="btn pri" onclick="A.savePlan()">Put on planner</button>`;
     } else if (m.type === "cust") {
       title = m.id ? "Edit customer" : "Add customer";
-      body = `${field("name", "Customer / business name *")}<div class="grid g2" style="gap:12px">${field("contact", "Contact person")}${field("phone", "Phone")}</div><div class="grid g2" style="gap:12px">${field("email", "Email")}${sel("terms", "Payment terms", [["On collection", "On collection"], ["14 days", "14 days"], ["30 days", "30 days"]])}</div>${field("address", "Address")}
-        <label class="row" style="cursor:pointer"><input type="checkbox" ${f.xero ? "checked" : ""} onchange="A.ff('xero',this.checked)" style="width:18px;height:18px"><span class="small">Match to a contact in Xero so job cards can be invoiced</span></label>`;
+      body = `${field("name", "Customer / business name *")}<div class="grid g2" style="gap:12px">${field("contact", "Contact person")}${field("phone", "Phone")}</div>${field("email", "Email")}${field("address", "Address")}`;
       ok = `<button class="btn pri" onclick="A.saveCust()">${m.id ? "Save" : "Add customer"}</button>`;
     } else if (m.type === "cv") {
       title = "Add vehicle · " + X.customer(m.id).name;
@@ -764,27 +738,17 @@
       save(); ui.modal = null; keep(render); toast("Planned for " + fmtDay(form.date));
     },
 
-    // Xero (demo: the invoice is created here; in production this is the Xero API call)
-    xero(id) {
-      const j = job(id), xs = S.settings.xero; const n = xs.nextInv || 1;
-      j.xero = { no: "INV-" + String(n).padStart(4, "0"), at: Date.now(), by: me.id, status: "Awaiting payment", total: Math.round(M.jobTotal(j) * 100) / 100 };
-      S.settings = Object.assign({}, S.settings, { xero: Object.assign({}, xs, { nextInv: n + 1 }) });
-      save(); keep(render); toast(j.xero.no + " sent to Xero");
-    },
-    xeroOpen(id) { toast("Demo — this opens " + job(id).xero.no + " in Xero"); },
-    xeroSync(id) { const x = job(id).xero; toast(x.no + " · " + x.status + " (up to date)"); },
-    xeroConn() { const x = S.settings.xero || {}; S.settings = Object.assign({}, S.settings, { xero: Object.assign({}, x, { connected: !x.connected, since: x.since || Date.now(), org: x.org || "Martley's of Portlaoise" }) }); save(); keep(render); toast(x.connected ? "Xero disconnected" : "Connected to Xero"); },
 
     // customers
     csearch(v) { ui.custQ = v; render(); const e = $("#q"); e.focus(); e.setSelectionRange(v.length, v.length); },
     custModal(id) {
       const c = id && X.customer(id), back = ui.modal && ui.modal.type === "job" ? { ...form } : null;
-      form = c ? { ...c } : { name: "", contact: "", phone: "", email: "", address: "", terms: "30 days", xero: true };
+      form = c ? { ...c } : { name: "", contact: "", phone: "", email: "", address: "" };
       ui.modal = { type: "cust", id, back, fresh: 1 }; keep(render);
     },
     saveCust() {
       if (!String(form.name).trim()) return toast("Enter the customer's name");
-      const m = ui.modal, data = { name: form.name.trim(), contact: form.contact, phone: form.phone, email: form.email, address: form.address, terms: form.terms, xero: !!form.xero };
+      const m = ui.modal, data = { name: form.name.trim(), contact: form.contact, phone: form.phone, email: form.email, address: form.address };
       let id = m.id;
       if (id) Object.assign(X.customer(id), data);
       else { id = "c-" + Date.now().toString(36); X.customers().push(Object.assign({ id, vehicles: [], notes: "", since: today() }, data)); }
@@ -795,7 +759,6 @@
       toast("Customer saved");
     },
     custNote(id, v) { X.customer(id).notes = v; save(); toast("Notes saved"); },
-    custXero(id) { const c = X.customer(id); c.xero = !c.xero; save(); keep(render); toast(c.xero ? "Linked to Xero contact" : "Unlinked from Xero"); },
     cvModal(cid) { form = { reg: "", model: "", type: "Minibus" }; ui.modal = { type: "cv", id: cid, fresh: 1 }; keep(render); },
     saveCv() {
       if (!String(form.reg).trim()) return toast("Enter the registration");

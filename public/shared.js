@@ -249,16 +249,16 @@ window.M = (function () {
     const cs = customersOf(S);
     if (!cs.length) cs.push(
       { id: INTERNAL, name: "Martley's fleet", internal: true, contact: "Transport office", phone: "057 862 0888", email: "info@martleys.com", address: "Kilminchy, Dublin Road, Portlaoise", vehicles: [], notes: "Internal work on Martley's own coaches, buses and minibuses.", since: "2008-01-01" },
-      { id: "c-dun", name: "Dunamase Hackney & Tours", contact: "Ger Lalor", phone: "086 201 7734", email: "ger@dunamasetours.ie", address: "Main Street, Stradbally, Co. Laois", terms: "30 days", xero: true, since: "2023-03-14",
+      { id: "c-dun", name: "Dunamase Hackney & Tours", contact: "Ger Lalor", phone: "086 201 7734", email: "ger@dunamasetours.ie", address: "Main Street, Stradbally, Co. Laois", terms: "30 days", since: "2023-03-14",
         notes: "Two Sprinters and a Ford Transit. Prefers Saturday morning drop-offs. Invoice to accounts@ address.",
         vehicles: [{ id: "cv-1", reg: "221-LS-4410", model: "Mercedes Sprinter 519", type: "Minibus" }, { id: "cv-2", reg: "191-LS-882", model: "Mercedes Sprinter 516", type: "Minibus" }, { id: "cv-3", reg: "202-KE-1170", model: "Ford Transit 17-seat", type: "Minibus" }] },
-      { id: "c-omh", name: "O'Moore Haulage Ltd", contact: "Siobhán Moore", phone: "057 868 3321", email: "workshop@omoorehaulage.ie", address: "Togher Industrial Estate, Portlaoise", terms: "30 days", xero: true, since: "2024-06-02",
+      { id: "c-omh", name: "O'Moore Haulage Ltd", contact: "Siobhán Moore", phone: "057 868 3321", email: "workshop@omoorehaulage.ie", address: "Togher Industrial Estate, Portlaoise", terms: "30 days", since: "2024-06-02",
         notes: "Rigid trucks — CVRT prep and brake work only. PO number required on every invoice.",
         vehicles: [{ id: "cv-4", reg: "182-LS-2290", model: "DAF LF 220", type: "Rigid truck" }, { id: "cv-5", reg: "211-LS-905", model: "Scania P280", type: "Rigid truck" }] },
-      { id: "c-hst", name: "Heywood School Transport", contact: "Declan Phelan", phone: "087 663 1408", email: "declan@heywoodtransport.ie", address: "Ballinakill, Co. Laois", terms: "14 days", xero: true, since: "2025-09-01",
+      { id: "c-hst", name: "Heywood School Transport", contact: "Declan Phelan", phone: "087 663 1408", email: "declan@heywoodtransport.ie", address: "Ballinakill, Co. Laois", terms: "14 days", since: "2025-09-01",
         notes: "School runs Mon–Fri — work must be done outside 8–9:30am and 2:30–4pm.",
         vehicles: [{ id: "cv-6", reg: "171-LS-3318", model: "Iveco Daily 33-seat", type: "School bus" }] },
-      { id: "c-pd", name: "Pat Dooley", contact: "Pat Dooley", phone: "085 140 2276", email: "", address: "Mountrath, Co. Laois", terms: "On collection", xero: false, since: addDaysIso(t, -9),
+      { id: "c-pd", name: "Pat Dooley", contact: "Pat Dooley", phone: "085 140 2276", email: "", address: "Mountrath, Co. Laois", terms: "On collection", since: addDaysIso(t, -9),
         notes: "Private customer — campervan conversion.", vehicles: [{ id: "cv-7", reg: "08-LS-3141", model: "VW Crafter campervan", type: "Van" }] });
 
     S.jobs.forEach(j => { if (!j.customerId) { j.customerId = INTERNAL; j.customer = "Martley's fleet"; } });
@@ -275,17 +275,14 @@ window.M = (function () {
       const done = mk({ customerId: "c-dun", customer: nameOf("c-dun"), vehicleId: "cv-3", type: "Defect repair", title: "Replace wiper blades & washer jets", mechId: "kd", status: "Complete", created: at(addDaysIso(t, -8), 9), closedAt: at(addDaysIso(t, -7), 12), signedOffBy: "kd", roadworthy: true,
         workDone: "Replaced both wiper blades and the nearside washer jet. Washer system tested OK.", labour: [{ mechId: "kd", start: at(addDaysIso(t, -7), 10), end: at(addDaysIso(t, -7), 11) + 15 * 6e4 }],
         parts: [{ desc: "Wiper blade 700mm", partNo: "WB-24-700", qty: 2, cost: 21.5, stockId: "st11" }, { desc: "Washer jet", partNo: "VDL-1452", qty: 1, cost: 9.8, stockId: "st10" }], plan: { date: addDaysIso(t, -7), hours: 1.5 } });
-      const dj = S.jobs.find(j => j.id === done); dj.xero = { no: "INV-0418", at: at(addDaysIso(t, -7), 14), by: "mk", status: "Paid", total: jobTotal(dj) };
       const done2 = mk({ customerId: "c-omh", customer: nameOf("c-omh"), vehicleId: "cv-5", type: "Service", title: "A service — 30,000 km", mechId: "lc", status: "Complete", created: at(addDaysIso(t, -14), 9), closedAt: at(addDaysIso(t, -13), 16), signedOffBy: "lc", roadworthy: true,
         workDone: "A service carried out to schedule. Oil and filter changed, all levels topped up.", labour: [{ mechId: "lc", start: at(addDaysIso(t, -13), 9), end: at(addDaysIso(t, -13), 12) + 30 * 6e4 }],
         parts: [{ desc: "Engine oil 10W-40 (litre)", partNo: "OIL-1040", qty: 28, cost: 4.2, stockId: "st12" }], plan: { date: addDaysIso(t, -13), hours: 3.5 } });
-      const dj2 = S.jobs.find(j => j.id === done2); dj2.xero = { no: "INV-0412", at: at(addDaysIso(t, -13), 17), by: "mk", status: "Awaiting payment", total: jobTotal(dj2) };
     }
 
     // put this week's open fleet work on the planner
     const slots = [[0, 3], [1, 2.5], [2, 4], [1, 1.5], [3, 6], [4, 2]];
     S.jobs.filter(j => j.status !== "Complete" && !j.plan && !isExternal(j) && j.mechId).forEach((j, i) => { const s = slots[i % slots.length]; const d = addDaysIso(t, s[0] % 3); j.plan = { date: d, hours: s[1] }; });
-    S.settings.xero = S.settings.xero || { connected: true, org: "Martley's of Portlaoise", since: at(addDaysIso(t, -30), 10), nextInv: 419 };
     S.settings.workshopV = 1;
     return true;
   }

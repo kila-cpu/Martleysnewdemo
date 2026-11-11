@@ -297,7 +297,7 @@ table.reg .acts button { width: 28px; }
   @page { size: A4; margin: 10mm; }
 }
 
-/* ---------- workshop additions: schedule, workshop screen, parts, customers, Xero ---------- */
+/* ---------- workshop additions: schedule, workshop screen, parts, customers ---------- */
 .fleetno.ext { background: #e0eaff; color: #1e40af; }
 .kv.c1 { grid-template-columns: 1fr; gap: 10px; }
 .kpi.blue .n { color: var(--blue); }
@@ -307,7 +307,6 @@ table.reg .acts button { width: 28px; }
 .custav { width: 36px; height: 36px; border-radius: 10px; background: var(--blue-bg); color: #1e40af; display: grid; place-items: center; font-weight: 800; font-size: 12px; flex: none; }
 .custav.int { background: var(--char); color: #fff; } .custav.lg { width: 56px; height: 56px; font-size: 18px; border-radius: 14px; }
 .locic { width: 32px; height: 32px; border-radius: 9px; background: var(--line2); display: grid; place-items: center; color: var(--char2); flex: none; }
-.xero { width: 24px; height: 24px; border-radius: 50%; background: #13b5ea; color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 14px; line-height: 1; flex: none; }
 .docgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
 .docgrid figure { margin: 0; } .docgrid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; cursor: zoom-in; display: block; }
 .docgrid figcaption, .docgrid em { font-size: 11px; color: var(--muted); font-style: normal; }
