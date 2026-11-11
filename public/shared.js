@@ -206,9 +206,39 @@ window.M = (function () {
     movesOf(S).unshift({ at: Date.now(), stockId: p.id, qty: Number(part.qty) || 0, jobId, by, why: "Returned from job" });
   }
 
-  // One-off data set-up for the workshop features (Leanne, customers, stock,
-  // external job cards, the week's schedule). Returns true if it changed S.
-  function migrate(S) {
+  // Data set-up, run once per step. Returns true if it changed S.
+  function migrate(S) { const a = migrate1(S), b = migrate2(S); return a || b; }
+
+  // Step 2: past outside-customer work, so the mobile Customer History has a record to show.
+  function migrate2(S) {
+    S.settings = S.settings || {};
+    if (!(S.settings.workshopV >= 1) || S.settings.workshopV >= 2) return false;
+    const at = (iso, h) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d, h || 9).getTime(); };
+    const cs = customersOf(S), nameOf = id => (cs.find(c => c.id === id) || {}).name || "";
+    const sp = id => { const p = stockOf(S).find(x => x.id === id); return p ? { desc: p.desc, partNo: p.partNo, cost: p.cost, stockId: p.id } : null; };
+    const part = (id, qty, desc, partNo, cost) => Object.assign(sp(id) || { desc, partNo, cost }, { qty });
+    [
+      ["2025-288", "c-dun", "cv-1", "Defect repair", "Heater blower not working", "Blower stops on speeds 1–3.", "kd", "2025-11-18", 2.5, "Blower resistor pack failed. Replaced resistor and checked all four speeds. Cleaned pollen filter housing.", [part(null, 1, "Blower resistor pack — Sprinter", "MB-A9068", 46)]],
+      ["2026-031", "c-dun", "cv-2", "Service", "A service — 180,000 km", "", "lc", "2026-02-10", 3, "A service to schedule. Oil and filters changed, brakes checked (front pads 6mm, rear 8mm). Wipers OK.", [part("st12", 12), part("st6", 1)]],
+      ["2026-084", "c-dun", "cv-1", "CVRT prep", "CVRT pre-test inspection", "Test booked Thursday.", "kd", "2026-05-06", 3.5, "Pre-test inspection. Replaced two marker lamps and a number plate lamp, adjusted headlamp aim. Passed CVRT 07/05.", [part("st3", 2), part("st2", 1)]],
+      ["2026-129", "c-dun", "cv-3", "Labour", "Fit new seat belts to rows 4–5", "", "lc", "2026-08-21", 2, "Fitted four new lap belt buckle assemblies on rows 4 and 5. Torqued to spec and tested.", [part("st9", 4)]],
+      ["2025-301", "c-omh", "cv-4", "CVRT prep", "CVRT pre-test inspection", "PO 4120.", "lc", "2025-12-02", 4, "Pre-test. Replaced rear fog lamp lens, topped up AdBlue, fixed air leak on trailer coupling. Passed.", [part("st13", 1), part(null, 1, "Rear fog lamp lens", "DAF-FOG-R", 18)]],
+      ["2026-052", "c-omh", "cv-5", "Defect repair", "Air leak — rear suspension", "Driver reports truck sitting low on nearside rear overnight.", "kd", "2026-03-17", 3, "Nearside rear air bag perished. Replaced air bag and checked levelling valve. No further leaks after 2h test.", [part(null, 1, "Air spring bellows — Scania rear", "SC-1730", 212)]],
+      ["2026-118", "c-omh", "cv-4", "Service", "B service — 240,000 km", "", "lc", "2026-07-29", 5, "B service. Oil, fuel and air filters changed. Front pads replaced. Greased all points.", [part("st12", 22), part("st4", 1), part("st5", 1), part("st7", 1)]],
+      ["2026-001", "c-hst", "cv-6", "Defect repair", "Wheelchair lift slow to raise", "", "kd", "2026-01-13", 2, "Lift hydraulic fluid low. Topped up, bled system and lubricated hinges. Lift cycling normally.", [part(null, 1, "Hydraulic fluid HV46 (litre)", "HV46-1", 9)]],
+      ["2026-123", "c-hst", "cv-6", "Service", "Summer service before school year", "Must be ready for 1 September.", "lc", "2026-08-12", 4.5, "Full service before the school year. Two new front tyres fitted, all seat belts checked, first aid kit and fire extinguisher in date.", [part("st12", 8), part("st16", 2)]],
+    ].forEach(([id, cust, veh, type, title, desc, mech, date, hours, workDone, parts]) => {
+      if (S.jobs.some(j => j.id === id)) return;
+      const start = at(date, 9), end = start + hours * 36e5;
+      S.jobs.push({ id, customerId: cust, customer: nameOf(cust), vehicleId: veh, type, title, desc, status: "Complete", priority: "Normal", mechId: mech, created: at(date, 8) - 864e5, closedAt: end, signedOffBy: mech, roadworthy: true,
+        labour: [{ mechId: mech, start, end }], rate: S.settings.rate || 55, parts, noParts: false, partsNotes: "", workDone, photos: [], docket: null, reportedBy: "lm", plan: { date, hours } });
+    });
+    S.settings.workshopV = 2;
+    return true;
+  }
+
+  // Step 1: the workshop features (Leanne, customers, stock, external job cards, the week's schedule).
+  function migrate1(S) {
     S.settings = S.settings || {};
     if (S.settings.workshopV >= 1) return false;
     const t = today(), wk = weekStart(t), at = (iso, h) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d, h || 9).getTime(); };

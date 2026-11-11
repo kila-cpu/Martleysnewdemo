@@ -9,7 +9,7 @@
   let draft = null;      // walk-around check in progress
   let jobDraft = null;   // new job card (Details tab before it is saved)
   let defDraft = null;   // ad-hoc defect report
-  const ui = { q: "", jobsTab: "all", jobsWho: "all", jq: "", hTab: "all", hq: "", sheet: null, sWeek: null, sDay: null, sWho: "all", sq: "", sLoc: "", sLow: false };
+  const ui = { q: "", jobsTab: "all", jobsWho: "all", jq: "", hTab: "all", hq: "", sheet: null, sWeek: null, sDay: null, sWho: "all", sq: "", sLoc: "", sLow: false, cq: "", cVeh: "" };
   const sigs = {};
   const LS = { me: "martleys-m-me", draft: "martleys-m-draft" };
 
@@ -71,6 +71,8 @@
       case "profile": return profile();
       case "schedule": return schedule();
       case "stock": return stock();
+      case "customers": return customers();
+      case "customer": return customerFile(r.parts[1]);
       case "defect": return reportDefect(r.q);
       case "jobs": if (r.q.tab) { ui.jobsTab = r.q.tab; window.history.replaceState(null, "", "#/jobs"); } return jobsList();
       case "job": return r.parts[1] === "new" ? jobNew(r.q) : jobSheet(r.parts[1], r.q.tab || "details");
@@ -136,7 +138,7 @@
       ${qa("#/defect", "alert", "Report a Defect", "Goes straight to the workshop")}
       ${qa("#/history", "list", "Check History", "This week's submissions")}
       ${qa("#/fleet", "bus", "Fleet Status", vor.length ? vor.length + " off road · " + S.vehicles.filter(v => X.checkedToday(v)).length + "/" + S.vehicles.length + " checked" : "Whole fleet available", { badge: vor.length || "" })}
-      ${qa("tel:0578620888", "phone", "Call the Depot", "057 862 0888")}
+      ${qa("#/customers", "folder", "Customer History", (() => { const ext = X.customers().filter(c => !c.internal); return ext.length + " customers · " + S.jobs.filter(j => M.isExternal(j) && j.status === "Complete").length + " jobs done"; })())}
       <div class="appver">App Version : 2.4.0</div></div>${tabs()}`;
   }
 
@@ -293,20 +295,21 @@
     const locked = !isNew && d.status === "Complete";
     return `<div class="card pad stack">
         <div class="row" style="gap:8px">${I("bus", 20)}<h2>Vehicle details</h2></div>
-        <div><label class="f">Reg no. *</label><select class="in" ${locked ? "disabled" : ""} onchange="${f}('vehicleId',this.value)"><option value="">Select vehicle…</option>${(M.isExternal(d) ? (X.custOf(d).vehicles || []).map(v => Object.assign({ fleet: "" }, v)) : S.vehicles).map(v => `<option value="${v.id}" ${v.id === d.vehicleId ? "selected" : ""}>${esc(v.reg)} · ${esc(v.fleet)} ${esc(v.model)}</option>`).join("")}</select></div>
+        <div><label class="f">Reg no. *</label><select class="in" ${locked ? "disabled" : ""} onchange="${f}('vehicleId',this.value)"><option value="">Select vehicle…</option>${(M.isExternal(d) ? (X.custOf(d).vehicles || []).map(v => Object.assign({ fleet: "" }, v)) : S.vehicles).map(v => `<option value="${v.id}" ${v.id === d.vehicleId ? "selected" : ""}>${esc(v.reg)} · ${esc([v.fleet, v.model].filter(Boolean).join(" "))}</option>`).join("")}</select></div>
         <div><label class="f">Service due</label><input class="in" ${locked ? "disabled" : ""} placeholder="e.g. 450,000 km or date" value="${esc(d.serviceDue || (d.vehicleId ? fmtD(X.veh(d.vehicleId).serviceDue) : ""))}" onchange="${f}('serviceDue',this.value)"></div>
         <div><label class="f">Job title *</label><input class="in" ${locked ? "disabled" : ""} placeholder="e.g. B service, replace marker lamp" value="${esc(d.title || "")}" ${isNew ? `oninput="A.nj('title',this.value,1)"` : `onchange="${f}('title',this.value)"`}></div>
       </div>
       <div class="card pad stack" style="margin-top:12px"><h2>Customer information</h2>
-        ${!isNew && M.isExternal(d) ? `<div><label class="f">Customer</label><div class="in" style="font-weight:700">${esc(X.custOf(d).name)}</div>${X.custOf(d).notes ? `<div class="xs muted" style="margin-top:6px">${esc(X.custOf(d).notes)}</div>` : ""}</div></div>` : `<div><label class="f">Customer name</label><input class="in" ${locked ? "disabled" : ""} placeholder="Martley's fleet" value="${esc(d.customer || "")}" ${isNew ? `oninput="A.nj('customer',this.value,1)"` : `onchange="${f}('customer',this.value)"`}></div></div>`}
+        ${M.isExternal(d) ? `<div><label class="f">Customer</label><div class="in" style="font-weight:700">${esc(X.custOf(d).name)}</div>${X.custOf(d).notes ? `<div class="xs muted" style="margin-top:6px">${esc(X.custOf(d).notes)}</div>` : ""}</div></div>` : `<div><label class="f">Customer name</label><input class="in" ${locked ? "disabled" : ""} placeholder="Martley's fleet" value="${esc(d.customer || "")}" ${isNew ? `oninput="A.nj('customer',this.value,1)"` : `onchange="${f}('customer',this.value)"`}></div></div>`}
       <div class="card pad" style="margin-top:12px"><div class="row" style="gap:8px;margin-bottom:12px"><h2 class="grow">Job type *</h2></div>
         ${M.JOB_TYPES.map(t => `<div class="radio ${d.type === t ? "on" : ""}" onclick="${locked ? "" : `${f}('type','${t}')`}"><span class="o"></span><div><div>${t}</div><div class="d">${typeDesc[t]}</div></div></div>`).join("")}</div>
       <div class="card pad" style="margin-top:12px"><label class="f">Priority</label><div class="chips">${M.PRIORITIES.map(p => `<button class="chip ${d.priority === p ? "on" : ""}" ${locked ? "disabled" : ""} onclick="${f}('priority','${p}')">${p === "VOR" ? "VOR · off road" : p}</button>`).join("")}</div></div>`;
   }
 
-  function jobNew() {
-    if (!jobDraft) jobDraft = { vehicleId: "", type: "", title: "", customer: "", serviceDue: "", priority: "Normal" };
-    return `<div class="bar"><a class="round" href="#/jobs">${I("x", 20, 2.4)}</a><div class="ttl">New job card</div><span class="side"></span></div>
+  function jobNew(q = {}) {
+    const c = q.cust && X.customer(q.cust);
+    if (!jobDraft || (c && jobDraft.customerId !== c.id)) jobDraft = { vehicleId: c && q.veh ? q.veh : "", type: "", title: "", customer: c ? c.name : "", customerId: c ? c.id : null, serviceDue: "", priority: "Normal" };
+    return `<div class="bar"><a class="round" href="${jobDraft.customerId ? "#/customer/" + jobDraft.customerId : "#/jobs"}">${I("x", 20, 2.4)}</a><div class="ttl">New job card</div><span class="side"></span></div>
       <div class="body" style="padding-bottom:20px"><div class="seg4">${TABS.map(([k, ic, l], i) => `<button class="${i === 0 ? "on" : ""}" ${i ? "disabled" : ""}>${I(ic, 18)}${l}</button>`).join("")}</div>${detailsForm(jobDraft, true)}</div>
       <div class="dock"><button class="btn lg pri block" onclick="A.createJob()">Next ${I("chev", 18, 2.5)}</button></div>`;
   }
@@ -398,6 +401,43 @@
     return `<div class="sj2 ${done ? "done" : ""} ${j.priority === "VOR" && !done ? "vor" : ""}"><a class="grow" href="#/job/${j.id}"><div class="row" style="gap:6px"><span class="jtag ${v.external ? "ext" : ""}">${esc(v.external ? v.reg : v.fleet)}</span><b class="xs">#${esc(j.id)}</b>${run ? `<span class="dot green"></span>` : ""}<span class="grow"></span><span class="xs muted">${j.plan ? j.plan.hours + "h" : esc(j.status)}</span></div>
       <div class="sjt">${esc(j.title)}</div><div class="xs muted">${done ? "Complete" : esc(j.status)}${M.isExternal(j) ? " · " + esc(j.customer) : ""}${unplanned && j.mechId ? " · " + esc(X.pname(j.mechId).split(" ")[0]) : ""}${j.priority === "VOR" && !done ? ` · <b style="color:var(--red)">VOR</b>` : ""}</div></a>
       ${done ? "" : `<button class="btn sm ${unplanned ? "brand" : ""}" onclick="A.sheet('plan:${j.id}')">${unplanned ? "Add" : "Amend"}</button>`}</div>`;
+  }
+
+  /* ---------- customer history ---------- */
+  // Outside customers and every job the workshop has done for them (no prices on the phone).
+  const custVehs = c => c.vehicles || [];
+  function customers() {
+    const q = ui.cq.toLowerCase();
+    const list = X.customers().filter(c => !c.internal).map(c => { const js = X.custJobs(c); return { c, js, last: js.slice().sort((a, b) => b.created - a.created)[0] }; })
+      .filter(({ c, js }) => !q || (c.name + " " + (c.contact || "") + " " + (c.phone || "") + " " + custVehs(c).map(v => v.reg + " " + v.model).join(" ") + " " + js.map(j => j.title).join(" ")).toLowerCase().includes(q))
+      .sort((a, b) => (b.last ? b.last.created : 0) - (a.last ? a.last.created : 0));
+    return screen("Customer History", `<div class="search">${I("search", 18)}<input id="csearch" placeholder="Search customer, reg or job…" value="${esc(ui.cq)}" oninput="A.csearch(this.value)" autocomplete="off"></div>
+      <div class="wkhead" style="margin-top:18px"><span>OUTSIDE CUSTOMERS (${list.length})</span><span>Most recent first</span></div>
+      ${list.map(({ c, js, last }) => { const done = js.filter(j => j.status === "Complete").length, open = js.length - done; return `<a class="cu" href="#/customer/${c.id}"><span class="cuav">${initials(c.name)}</span><div class="grow" style="min-width:0"><div class="cut ellipsis">${esc(c.name)}</div><div class="xs muted ellipsis">${esc(c.contact || "")}${c.phone ? " · " + esc(c.phone) : ""}</div>
+        <div class="cumeta"><span>${I("bus", 13)} ${custVehs(c).length} vehicle${custVehs(c).length === 1 ? "" : "s"}</span><span>${I("check", 13)} ${done} done</span>${open ? `<span class="on">${I("wrench", 13)} ${open} in now</span>` : ""}</div>
+        <div class="xs muted" style="margin-top:4px">${last ? "Last job " + fmtD(isoOf(last.created)) + " · " + esc(last.title) : "No jobs yet"}</div></div><span class="qc">${I("chev", 18, 2.4)}</span></a>`; }).join("") || `<div class="empty">No customers match.</div>`}`, { back: "#/" });
+  }
+  function customerFile(id) {
+    const c = X.customer(id);
+    if (!c || c.internal) return screen("Customer", `<div class="empty">Customer not found. <a href="#/customers">All customers</a></div>`, { back: "#/customers" });
+    const vehs = custVehs(c);
+    if (ui.cVeh && !vehs.some(v => v.id === ui.cVeh)) ui.cVeh = "";
+    const all = X.custJobs(c).sort((a, b) => (b.closedAt || b.created) - (a.closedAt || a.created));
+    const js = all.filter(j => !ui.cVeh || j.vehicleId === ui.cVeh);
+    const open = js.filter(j => j.status !== "Complete"), done = js.filter(j => j.status === "Complete");
+    const item = j => { const v = X.veh(j.vehicleId) || {}, live = j.status !== "Complete"; return `<a class="wh ${live ? "live" : ""}" href="#/job/${j.id}${live ? "" : "?tab=done"}"><div class="row" style="gap:8px"><span class="jno">#${esc(j.id)}</span><span class="reg sm">${esc(v.reg || "—")}</span><span class="grow"></span><span class="xs muted">${fmtD(isoOf(j.closedAt || j.created))}</span></div>
+      <div class="jttl" style="margin-top:6px">${esc(j.title)}</div><div class="xs muted">${esc(j.type)} · ${j.mechId ? esc(X.pname(j.mechId)) : "Unassigned"} · ${hrs(M.jobMins(j))}${live ? " · <b style='color:var(--green-ink)'>" + esc(j.status) + "</b>" : ""}</div>
+      ${j.workDone ? `<div class="whwork">${esc(j.workDone)}</div>` : live && j.desc ? `<div class="whwork">${esc(j.desc)}</div>` : ""}
+      ${(j.parts || []).length ? `<div class="whparts">${j.parts.map(p => `<span>${esc(p.desc)} × ${p.qty}</span>`).join("")}</div>` : ""}</a>`; };
+    return screen(c.name, `<div class="card pad cuhd"><div class="row" style="gap:12px"><span class="cuav lg">${initials(c.name)}</span><div class="grow" style="min-width:0"><div class="cut">${esc(c.name)}</div><div class="xs muted">Customer since ${c.since ? fmtD(c.since) : "—"}</div></div>${c.phone ? `<a class="round2" href="tel:${esc(c.phone.replace(/\s/g, ""))}" aria-label="Call">${I("phone", 18)}</a>` : ""}</div>
+        <div class="kvm"><div><span>Contact</span><b>${esc(c.contact || "—")}</b></div><div><span>Phone</span><b>${esc(c.phone || "—")}</b></div>${c.address ? `<div style="grid-column:1/-1"><span>Address</span><b>${esc(c.address)}</b></div>` : ""}</div>
+        ${c.notes ? `<div class="worknote" style="margin-top:12px"><span>Note</span>${esc(c.notes)}</div>` : ""}</div>
+      <div class="pills" style="margin-top:14px"><button class="pl ${!ui.cVeh ? "on" : ""}" onclick="A.cveh('')">All vehicles <span>${all.length}</span></button>${vehs.map(v => `<button class="pl ${ui.cVeh === v.id ? "on" : ""}" onclick="A.cveh('${v.id}')">${esc(v.reg)} <span>${all.filter(j => j.vehicleId === v.id).length}</span></button>`).join("")}</div>
+      ${ui.cVeh ? (v => `<div class="xs muted" style="margin:8px 2px 0">${esc(v.model || "")}${v.type ? " · " + esc(v.type) : ""}</div>`)(vehs.find(v => v.id === ui.cVeh)) : ""}
+      <a class="btn lg brand block" href="#/job/new?cust=${c.id}${ui.cVeh ? "&veh=" + ui.cVeh : ""}" style="margin-top:14px">+ New Job Card</a>
+      ${open.length ? `<div class="wkhead" style="margin-top:18px"><span>IN THE WORKSHOP NOW (${open.length})</span></div>${open.map(item).join("")}` : ""}
+      <div class="wkhead" style="margin-top:18px"><span>WORK HISTORY (${done.length})</span><span>Newest first</span></div>
+      ${done.map(item).join("") || `<div class="empty">No completed jobs${ui.cVeh ? " on this vehicle" : ""} yet.</div>`}`, { back: "#/customers" });
   }
 
   /* ---------- parts & stock ---------- */
@@ -574,6 +614,8 @@
     // stock
     ssearch(v) { ui.sq = v; render(); const e = $("#ssearch"); e.focus(); e.setSelectionRange(v.length, v.length); },
     sloc(id) { ui.sLoc = id; keep(render); },
+    csearch(v) { ui.cq = v; render(); const e = $("#csearch"); e.focus(); e.setSelectionRange(v.length, v.length); },
+    cveh(id) { ui.cVeh = id; keep(render); },
     slow() { ui.sLow = !ui.sLow; keep(render); },
     saveAdj(id) {
       const pt = X.stockItem(id), n = Number($("#adj-qty").value) || 0, loc = $("#adj-loc").value, bin = $("#adj-bin").value.trim();
@@ -670,7 +712,7 @@
       if (!d.title.trim()) return toast("Give the job a title");
       if (!d.type) return toast("Choose a job type");
       const id = X.nextJobId();
-      S.jobs.push({ id, vehicleId: d.vehicleId, type: d.type, customer: d.customer.trim() || "Martley's fleet", serviceDue: d.serviceDue, status: "Open", priority: d.priority, mechId: me.id, title: d.title.trim(), desc: "", created: Date.now(), labour: [], rate: (S.settings || {}).rate || 55, parts: [], noParts: false, partsNotes: "", workDone: "", photos: [], docket: null, reportedBy: me.id });
+      S.jobs.push({ id, vehicleId: d.vehicleId, type: d.type, customer: d.customer.trim() || "Martley's fleet", customerId: d.customerId || M.INTERNAL, serviceDue: d.serviceDue, status: "Open", priority: d.priority, mechId: me.id, title: d.title.trim(), desc: "", created: Date.now(), labour: [], rate: (S.settings || {}).rate || 55, parts: [], noParts: false, partsNotes: "", workDone: "", photos: [], docket: null, reportedBy: me.id });
       save(); jobDraft = null;
       go("#/job/" + id + "?tab=work");
     },
