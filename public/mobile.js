@@ -91,7 +91,7 @@
 
   /* ---------- login ---------- */
   function login() {
-    const ppl = S.staff.filter(s => s.role !== "admin").sort((a, b) => a.name.localeCompare(b.name));
+    const ppl = S.staff.filter(s => s.role !== "admin").sort((a, b) => (a.role === "mechanic" ? 0 : 1) - (b.role === "mechanic" ? 0 : 1) || a.name.localeCompare(b.name));   // workshop first
     return `<div class="login2"><div class="logoc"><img src="logo.png" alt="Martley's"></div>
       <div class="lpanel"><select class="lin" id="luser" onchange="document.getElementById('lerr').textContent=''"><option value="">SELECT USER</option>${ppl.map(p => `<option value="${p.id}">${esc(p.name)} · ${esc(M.ROLE[p.role])}</option>`).join("")}</select>
         <input class="lin" id="lpin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="PIN" onkeydown="if(event.key==='Enter')A.login()"></div>

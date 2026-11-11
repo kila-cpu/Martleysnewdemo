@@ -81,7 +81,7 @@
         <div class="grp">Compliance</div>${link("checks", "clip", "Walk-around checks")}${link("defects", "alert", "Defects", openDefs, openDefs > 0)}
         <div class="grp">Workshop</div>${link("schedule", "calendar", "Schedule", todayN ? todayN + " today" : "")}${link("jobs", "wrench", "Job cards", openJobs)}${link("parts", "box", "Parts &amp; stock", low ? low + " low" : "", low > 0)}${link("customers", "folder", "Customers")}${link("fleet", "bus", "Fleet", vor ? vor + " VOR" : "", vor > 0)}
         <div class="grp">Admin</div>${link("team", "users", "Team")}${link("settings", "cog", "Settings")}</nav>
-      <a class="phone" href="../" target="_blank">${I("phone", 16)} Open driver app ${I("external", 13)}</a>
+      <a class="phone" href="../" target="_blank">${I("phone", 16)} Open mobile app ${I("external", 13)}</a>
       <div class="foot"><span class="${avc(me)}">${initials(me.name)}</span><div><div style="font-weight:700">${esc(me.name)}</div><div class="xs" style="color:#aab4c3">${esc(roleOf(me))}</div></div><button class="ic" title="Sign out" onclick="A.logout()">${I("out", 18)}</button></div></aside>`;
   }
 
@@ -94,7 +94,7 @@
         <label class="f" style="margin-top:22px">Who's signing in?</label><select class="in" id="who">${admins.map(a => `<option value="${a.id}">${esc(a.name)}${a.title ? " — " + esc(a.title) : ""}</option>`).join("")}</select>
         <label class="f" style="margin-top:16px">PIN</label><div class="pinin"><input type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••" oninput="A.pinIn(this)"></div>
         <div class="xs muted">Demo PIN 3333</div><div id="pinerr" class="small" style="color:var(--red);margin-top:8px"></div>
-        <div class="notice blue" style="margin-top:28px">${I("phone")}<div>Drivers and mechanics use the <a href="../" style="font-weight:700;text-decoration:underline">phone app</a>.</div></div></div></div></div>`;
+        <div class="notice blue" style="margin-top:28px">${I("phone")}<div>Mechanics and drivers use the <a href="../" style="font-weight:700;text-decoration:underline">mobile app</a>.</div></div></div></div></div>`;
   }
 
   /* ---------- overview ---------- */
@@ -180,7 +180,7 @@
     // page buttons: 1 … around current … last
     const nums = [...new Set([1, ui.page - 1, ui.page, ui.page + 1, pages])].filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
     const pager = nums.map((n, i) => (i && n - nums[i - 1] > 1 ? `<span class="gap">…</span>` : "") + `<button class="${n === ui.page ? "on" : ""}" onclick="A.page(${n})">${n}</button>`).join("");
-    return `<div class="head"><div class="grow"><h1>Daily Walk-Around Checklist</h1><div class="sub">Every vehicle check submitted from the driver app</div></div>
+    return `<div class="head"><div class="grow"><h1>Daily Walk-Around Checklist</h1><div class="sub">Every vehicle check submitted from the mobile app</div></div>
         <div class="search">${I("search", 16)}<input id="q" placeholder="Search…" value="${esc(ui.q)}" oninput="A.search(this.value)"></div><button class="btn" onclick="A.csv()">${I("upload", 16)} CSV</button></div>
       <div class="card pad filterbar">
         <div><label class="f">From</label><input type="date" class="in" value="${ui.cFrom}" max="${today()}" onchange="A.cf('cFrom',this.value)"></div>
@@ -551,7 +551,7 @@
   function teamPage() {
     const since = Date.now() - 30 * 864e5;
     const groups = ["driver", "mechanic", "admin"];
-    return `<div class="head"><div class="grow"><h1>Team</h1><div class="sub">Who can sign in to the driver app and admin, and their PINs</div></div><button class="btn pri" onclick="A.staffModal()">${I("plus", 16)} Add person</button></div>
+    return `<div class="head"><div class="grow"><h1>Team</h1><div class="sub">Who can sign in to the mobile app and admin, and their PINs</div></div><button class="btn pri" onclick="A.staffModal()">${I("plus", 16)} Add person</button></div>
       ${groups.map(g => { const ppl = S.staff.filter(s => s.role === g); return `<div class="card" style="margin-bottom:16px"><div class="ch"><h2>${M.ROLE[g]}s</h2><span class="right muted small">${ppl.length}</span></div><div class="tscroll"><table class="t"><thead><tr><th>Name</th><th>Phone</th><th>${g === "admin" ? "" : "Licence"}</th><th>Joined</th><th class="num">${g === "driver" ? "Checks (30 days)" : g === "mechanic" ? "Hours (30 days)" : ""}</th><th class="num">${g === "driver" ? "Defects reported" : g === "mechanic" ? "Jobs completed" : ""}</th><th>PIN</th><th></th></tr></thead><tbody>
         ${ppl.map(p => `<tr><td><div class="row"><span class="${avc(p)}">${initials(p.name)}</span><div><b>${esc(p.name)}</b>${p.title ? `<div class="xs muted">${esc(p.title)}</div>` : ""}</div></div></td><td class="small">${esc(p.phone || "—")}</td><td class="small">${esc(p.licence || "")}</td><td class="small">${p.joined ? fmtD(p.joined) : "—"}</td>
           <td class="num">${g === "driver" ? S.checks.filter(c => c.driverId === p.id && c.at > since).length : g === "mechanic" ? hrs(S.jobs.reduce((a, j) => a + (j.labour || []).filter(l => l.mechId === p.id && l.start > since).reduce((b, l) => b + ((l.end || Date.now()) - l.start) / 60000, 0), 0)) : ""}</td>
