@@ -114,7 +114,7 @@
     const vor = S.vehicles.filter(X.vorJob), att = attention();
     const dv = draft && X.veh(draft.vehicleId);
     const run = S.jobs.find(j => (j.labour || []).some(l => !l.end && l.mechId === me.id));
-    const driver = me.role === "driver", checked = todays.length > 0;
+    const checked = todays.length > 0;
     const head = `<div class="hhead"><div class="row" style="gap:12px"><span class="hav">${initials(me.name)}</span><div class="grow"><h1>Good ${hr < 12 ? "Morning" : hr < 18 ? "Afternoon" : "Evening"}, ${esc(me.name.split(" ")[0])}</h1><div class="htime"><i class="dot green"></i><span data-clock="m">${fmtT(Date.now())}</span>${c ? ` · on ${esc(c.type)} since ${fmtT(c.at)}` : ""}</div></div>
           <a class="hic" href="#/fleet" aria-label="Fleet status">${I("bus", 19)}</a><button class="hic" onclick="A.sheet('alerts')" aria-label="Needs attention">${I("alert", 19)}${att.length ? `<span class="hdot">${att.length}</span>` : ""}</button></div>
         <div class="hbtns">${c ? `<button class="hout" onclick="A.sheet('clockout')">${I("clock", 18)} Clock Out</button>` : `<button class="hin" onclick="A.clockIn()">${I("check", 18, 2.6)} Clock In</button>`}<button class="hsw" onclick="A.sheet('switch')">${I("refresh", 18)} Switch</button></div></div>`;
@@ -127,7 +127,7 @@
     return head + `<div class="body home2">${now}<h2 class="qah">Quick Access</h2>
       ${qa("#/check/new", "clip", "Walk-around Checklist", dv ? "Continue check on " + esc(dv.fleet) + " · " + Object.keys(draft.results).length + " items done" : checked ? "Done today at " + fmtT(todays[0].at) + " · " + esc(X.veh(todays[0].vehicleId).fleet) : "Complete before shift")}
       ${qa("#/defect", "alert", "Report a Defect", "Goes straight to the workshop")}
-      ${qa("#/jobs", "wrench", "Job Sheets", mineOpen.length ? mineOpen.length + " assigned to you · " + open.length + " open" : open.length + " open job cards", { badge: mineOpen.length || "", locked: driver && !checked })}
+      ${qa("#/jobs", "wrench", "Job Sheets", mineOpen.length ? mineOpen.length + " assigned to you · " + open.length + " open" : open.length + " open job cards", { badge: mineOpen.length || "" })}
       ${qa("#/history", "list", "Check History", "This week's submissions")}
       ${qa("#/fleet", "bus", "Fleet Status", vor.length ? vor.length + " off road · " + S.vehicles.filter(v => X.checkedToday(v)).length + "/" + S.vehicles.length + " checked" : "Whole fleet available", { badge: vor.length || "" })}
       ${qa("tel:0578620888", "phone", "Call the Depot", "057 862 0888")}
